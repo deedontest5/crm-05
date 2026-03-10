@@ -170,7 +170,7 @@ Deno.serve(async (req) => {
     const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
-    const appUrl = 'https://crm-rt-4.lovable.app';
+    const appUrl = 'https://crm.realthingks.com';
 
     // Check for test mode
     let testUserId: string | null = null;
