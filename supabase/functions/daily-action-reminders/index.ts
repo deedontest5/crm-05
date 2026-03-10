@@ -181,6 +181,26 @@ Deno.serve(async (req) => {
 
     if (testUserId) {
       console.log(`TEST MODE: Running for user ${testUserId} only, bypassing time checks`);
+
+      // In test mode, ensure the user has notification preferences with task_reminders enabled
+      const { data: existingPref } = await supabase
+        .from('notification_preferences')
+        .select('user_id')
+        .eq('user_id', testUserId)
+        .maybeSingle();
+
+      if (!existingPref) {
+        await supabase
+          .from('notification_preferences')
+          .insert({ user_id: testUserId, task_reminders: true, email_notifications: true });
+        console.log(`Created notification preferences for test user ${testUserId}`);
+      } else {
+        await supabase
+          .from('notification_preferences')
+          .update({ task_reminders: true, email_notifications: true })
+          .eq('user_id', testUserId);
+        console.log(`Updated notification preferences for test user ${testUserId}`);
+      }
     }
 
     // Get all users with task_reminders enabled
