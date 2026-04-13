@@ -5,10 +5,8 @@ import { useState, useMemo, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { ArrowLeft, Clock, AlertTriangle, CheckCircle2, Circle, Target, FileText, Users, Building2, MessageSquare, BarChart3, ChevronDown, ListTodo, Megaphone } from "lucide-react";
+import { ArrowLeft, Clock, AlertTriangle, CheckCircle2, Circle, ChevronDown } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { CampaignModal } from "@/components/campaigns/CampaignModal";
@@ -18,6 +16,7 @@ import { CampaignContacts } from "@/components/campaigns/CampaignContacts";
 import { CampaignCommunications } from "@/components/campaigns/CampaignCommunications";
 import { CampaignAnalytics } from "@/components/campaigns/CampaignAnalytics";
 import { CampaignActionItems } from "@/components/campaigns/CampaignActionItems";
+import { CampaignOverview } from "@/components/campaigns/CampaignOverview";
 
 const statusColors: Record<string, string> = {
   Draft: "bg-muted text-muted-foreground",
