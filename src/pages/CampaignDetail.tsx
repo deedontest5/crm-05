@@ -5,10 +5,8 @@ import { useState, useMemo, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { ArrowLeft, Clock, AlertTriangle, CheckCircle2, Circle, Target, FileText, Users, Building2, MessageSquare, BarChart3, ChevronDown, ListTodo, Megaphone } from "lucide-react";
+import { ArrowLeft, Clock, AlertTriangle, CheckCircle2, Circle, ChevronDown } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { CampaignModal } from "@/components/campaigns/CampaignModal";
@@ -18,6 +16,7 @@ import { CampaignContacts } from "@/components/campaigns/CampaignContacts";
 import { CampaignCommunications } from "@/components/campaigns/CampaignCommunications";
 import { CampaignAnalytics } from "@/components/campaigns/CampaignAnalytics";
 import { CampaignActionItems } from "@/components/campaigns/CampaignActionItems";
+import { CampaignOverview } from "@/components/campaigns/CampaignOverview";
 
 const statusColors: Record<string, string> = {
   Draft: "bg-muted text-muted-foreground",
@@ -50,6 +49,14 @@ export default function CampaignDetail() {
       toast.info(`This campaign ended on ${detail.campaign.end_date} and has been marked Completed.`);
     }
   }, [detail.campaign, detail.isCampaignEnded]);
+
+  // Set document title to campaign name
+  useEffect(() => {
+    if (detail.campaign?.campaign_name) {
+      document.title = `${detail.campaign.campaign_name} — Campaign`;
+    }
+    return () => { document.title = "CRM"; };
+  }, [detail.campaign?.campaign_name]);
 
   if (detail.isLoading) {
     return (
@@ -216,87 +223,15 @@ export default function CampaignDetail() {
           <div className="flex-1 overflow-auto mt-4">
             {/* Overview */}
             <TabsContent value="overview" className="mt-0">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-                {[
-                  { label: "Accounts targeted", value: detail.accounts.length, icon: Building2 },
-                  { label: "Contacts targeted", value: detail.contacts.length, icon: Users },
-                  { label: "Emails sent", value: detail.communications.filter((c: any) => c.communication_type === "Email").length, icon: MessageSquare },
-                  { label: "Calls made", value: detail.communications.filter((c: any) => c.communication_type === "Call").length, icon: MessageSquare },
-                ].map((stat) => (
-                  <Card key={stat.label}>
-                    <CardContent className="p-4">
-                      <p className="text-xs text-muted-foreground">{stat.label}</p>
-                      <p className="text-2xl font-semibold mt-1">{stat.value}</p>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {/* Details */}
-                <Card>
-                  <CardHeader className="py-3"><CardTitle className="text-sm flex items-center gap-2"><FileText className="h-4 w-4" /> Details</CardTitle></CardHeader>
-                  <CardContent className="space-y-2 text-sm">
-                    <div className="flex justify-between"><span className="text-muted-foreground">Type</span><span>{campaign.campaign_type}</span></div>
-                    <div className="flex justify-between"><span className="text-muted-foreground">Status</span><Badge className={statusColors[campaign.status || "Draft"]} variant="secondary">{campaign.status}</Badge></div>
-                    <div className="flex justify-between"><span className="text-muted-foreground">Owner</span><span>{campaign.owner ? displayNames[campaign.owner] || "—" : "—"}</span></div>
-                  </CardContent>
-                </Card>
-
-                {/* MART Quick Status */}
-                <Card>
-                  <CardHeader className="py-3"><CardTitle className="text-sm flex items-center gap-2"><Target className="h-4 w-4" /> MART Status</CardTitle></CardHeader>
-                  <CardContent className="space-y-2">
-                    {[
-                      { label: "Message", done: isMARTComplete.message },
-                      { label: "Audience", done: isMARTComplete.audience },
-                      { label: "Region", done: isMARTComplete.region },
-                      { label: "Timing", done: isMARTComplete.timing },
-                    ].map((item) => (
-                      <div key={item.label} className="flex items-center gap-2 text-sm">
-                        {item.done ? <CheckCircle2 className="h-4 w-4 text-primary shrink-0" /> : <Circle className="h-4 w-4 text-muted-foreground shrink-0" />}
-                        <span className={item.done ? "text-foreground" : "text-muted-foreground"}>{item.label}</span>
-                      </div>
-                    ))}
-                  </CardContent>
-                </Card>
-
-                {/* Recent Activity */}
-                <Card>
-                  <CardHeader className="py-3"><CardTitle className="text-sm flex items-center gap-2"><MessageSquare className="h-4 w-4" /> Recent Activity</CardTitle></CardHeader>
-                  <CardContent>
-                    {detail.communications.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">No activity yet</p>
-                    ) : (
-                      <div className="space-y-2">
-                        {detail.communications.slice(0, 5).map((c: any) => (
-                          <div key={c.id} className="flex items-center gap-2 text-sm">
-                            <Badge variant="outline" className="text-xs shrink-0">{c.communication_type}</Badge>
-                            <span className="truncate">{c.contacts?.contact_name || "Unknown"}</span>
-                            <span className="text-xs text-muted-foreground ml-auto whitespace-nowrap">
-                              {c.communication_date ? format(new Date(c.communication_date), "dd MMM") : "—"}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </div>
-
-              {/* Goal & Notes */}
-              {campaign.goal && (
-                <Card className="mt-4">
-                  <CardHeader className="py-3"><CardTitle className="text-sm">Goal</CardTitle></CardHeader>
-                  <CardContent><p className="text-sm text-muted-foreground">{campaign.goal}</p></CardContent>
-                </Card>
-              )}
-              {campaign.notes && (
-                <Card className="mt-4">
-                  <CardHeader className="py-3"><CardTitle className="text-sm">Notes</CardTitle></CardHeader>
-                  <CardContent><p className="text-sm text-muted-foreground whitespace-pre-wrap">{campaign.notes.replace(/\[timezone:.+?\]\s*/g, "").trim()}</p></CardContent>
-                </Card>
-              )}
+              <CampaignOverview
+                campaign={campaign}
+                accounts={detail.accounts}
+                contacts={detail.contacts}
+                communications={detail.communications}
+                isMARTComplete={isMARTComplete}
+                martProgress={martProgress}
+                onTabChange={setActiveTab}
+              />
             </TabsContent>
 
             {/* MART Strategy — unified tab */}
