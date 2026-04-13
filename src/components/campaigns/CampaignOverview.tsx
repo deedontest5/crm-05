@@ -127,20 +127,16 @@ export function CampaignOverview({
 
   return (
     <div className="space-y-4">
-      {/* Primary stats — clickable */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard label="Accounts targeted" value={accounts.length} icon={Building2} onClick={() => onTabChange("accounts")} />
-        <StatCard label="Contacts targeted" value={contacts.length} icon={Users} onClick={() => onTabChange("contacts")} />
-        <StatCard label="Emails sent" value={emailCount} icon={MessageSquare} onClick={() => onTabChange("outreach")} />
-        <StatCard label="Calls made" value={callCount} icon={Phone} onClick={() => onTabChange("outreach")} />
-      </div>
-
-      {/* Secondary stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard label="LinkedIn messages" value={linkedinCount} icon={Linkedin} onClick={() => onTabChange("outreach")} />
-        <StatCard label="Responses" value={responseCount} icon={TrendingUp} subtitle={contacts.length > 0 ? `${Math.round((responseCount / contacts.length) * 100)}% response rate` : undefined} />
-        <StatCard label="Deals created" value={deals.length} icon={BarChart3} onClick={() => onTabChange("analytics")} subtitle={totalDealValue > 0 ? `€${totalDealValue.toLocaleString()} TCV` : undefined} />
-        <StatCard label="MART progress" value={`${martProgress}/4`} icon={Target} onClick={() => onTabChange("mart")} subtitle={`${Math.round((martProgress / 4) * 100)}% complete`} />
+      {/* All 8 stats in one row */}
+      <div className="grid grid-cols-4 xl:grid-cols-8 gap-3">
+        <StatCard label="Accounts" value={accounts.length} icon={Building2} onClick={() => onTabChange("accounts")} />
+        <StatCard label="Contacts" value={contacts.length} icon={Users} onClick={() => onTabChange("contacts")} />
+        <StatCard label="Emails" value={emailCount} icon={MessageSquare} onClick={() => onTabChange("outreach")} />
+        <StatCard label="Calls" value={callCount} icon={Phone} onClick={() => onTabChange("outreach")} />
+        <StatCard label="LinkedIn" value={linkedinCount} icon={Linkedin} onClick={() => onTabChange("outreach")} />
+        <StatCard label="Responses" value={responseCount} icon={TrendingUp} subtitle={contacts.length > 0 ? `${Math.round((responseCount / contacts.length) * 100)}%` : undefined} />
+        <StatCard label="Deals" value={deals.length} icon={BarChart3} onClick={() => onTabChange("analytics")} subtitle={totalDealValue > 0 ? `€${totalDealValue.toLocaleString()}` : undefined} />
+        <StatCard label="MART" value={`${martProgress}/4`} icon={Target} onClick={() => onTabChange("mart")} subtitle={`${Math.round((martProgress / 4) * 100)}%`} />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -247,8 +243,8 @@ export function CampaignOverview({
         </Card>
       )}
 
-      {/* Details card */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {/* Details, Description, Goal, Notes — compact layout */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
           <CardHeader className="py-3"><CardTitle className="text-sm flex items-center gap-2"><FileText className="h-4 w-4" /> Details</CardTitle></CardHeader>
           <CardContent className="space-y-2 text-sm">
@@ -259,29 +255,34 @@ export function CampaignOverview({
           </CardContent>
         </Card>
 
-        <div className="space-y-4">
-          {campaign.description && (
-            <Card>
-              <CardHeader className="py-3"><CardTitle className="text-sm">Description</CardTitle></CardHeader>
-              <CardContent><p className="text-sm text-muted-foreground">{campaign.description}</p></CardContent>
-            </Card>
-          )}
-          {campaign.goal && (
-            <Card>
-              <CardHeader className="py-3"><CardTitle className="text-sm">Goal</CardTitle></CardHeader>
-              <CardContent><p className="text-sm text-muted-foreground">{campaign.goal}</p></CardContent>
-            </Card>
-          )}
-        </div>
-      </div>
+        {(campaign.description || campaign.goal) && (
+          <Card>
+            <CardContent className="space-y-3 pt-4 text-sm">
+              {campaign.description && (
+                <div>
+                  <p className="font-medium text-sm mb-1">Description</p>
+                  <p className="text-muted-foreground">{campaign.description}</p>
+                </div>
+              )}
+              {campaign.goal && (
+                <div>
+                  <p className="font-medium text-sm mb-1">Goal</p>
+                  <p className="text-muted-foreground">{campaign.goal}</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
-      {/* Notes */}
-      {campaign.notes && (
-        <Card>
-          <CardHeader className="py-3"><CardTitle className="text-sm">Notes</CardTitle></CardHeader>
-          <CardContent><p className="text-sm text-muted-foreground whitespace-pre-wrap">{campaign.notes.replace(/\[timezone:.+?\]\s*/g, "").trim()}</p></CardContent>
-        </Card>
-      )}
+        {campaign.notes && (
+          <Card>
+            <CardContent className="pt-4">
+              <p className="font-medium text-sm mb-1">Notes</p>
+              <p className="text-sm text-muted-foreground whitespace-pre-wrap">{campaign.notes.replace(/\[timezone:.+?\]\s*/g, "").trim()}</p>
+            </CardContent>
+          </Card>
+        )}
+      </div>
     </div>
   );
 }

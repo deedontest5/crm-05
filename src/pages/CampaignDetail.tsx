@@ -50,13 +50,19 @@ export default function CampaignDetail() {
     }
   }, [detail.campaign, detail.isCampaignEnded]);
 
-  // Set document title to campaign name
+  // Set document title and update URL to show campaign name instead of UUID
   useEffect(() => {
     if (detail.campaign?.campaign_name) {
       document.title = `${detail.campaign.campaign_name} — Campaign`;
+      const slug = detail.campaign.campaign_name
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-|-$/g, "");
+      const newUrl = `/campaigns/${slug}--${id}`;
+      window.history.replaceState(null, "", newUrl);
     }
     return () => { document.title = "CRM"; };
-  }, [detail.campaign?.campaign_name]);
+  }, [detail.campaign?.campaign_name, id]);
 
   if (detail.isLoading) {
     return (
