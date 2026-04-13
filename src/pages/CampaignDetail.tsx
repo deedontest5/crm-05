@@ -118,9 +118,6 @@ export default function CampaignDetail() {
       {/* Header */}
       <div className="flex-shrink-0 h-16 px-6 border-b bg-background flex items-center justify-between">
         <div className="flex items-center gap-3 min-w-0">
-          <Button variant="ghost" size="icon" className="shrink-0" onClick={() => navigate("/campaigns")}>
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
           <div className="min-w-0">
             <h1 className="text-lg font-semibold text-foreground truncate">{campaign.campaign_name}</h1>
             <p className="text-xs text-muted-foreground truncate">
