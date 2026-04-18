@@ -145,12 +145,13 @@ export function CampaignStrategy({ campaignId, campaign, isStrategyComplete, upd
     timing: <Clock className="h-4 w-4" />,
   };
 
-  // Per-section color theming using semantic tokens (always visible border + tinted bg)
+  // Unified header styling — all sections use the Region (blue) theme
+  const unifiedStyle = { header: "bg-blue-500/10 hover:bg-blue-500/15", icon: "text-blue-600 dark:text-blue-400", border: "border-l-4 border-l-blue-500" };
   const sectionStyles: Record<string, { header: string; icon: string; border: string }> = {
-    region:   { header: "bg-blue-500/10 hover:bg-blue-500/15",       icon: "text-blue-600 dark:text-blue-400",       border: "border-l-4 border-l-blue-500" },
-    audience: { header: "bg-purple-500/10 hover:bg-purple-500/15",   icon: "text-purple-600 dark:text-purple-400",   border: "border-l-4 border-l-purple-500" },
-    message:  { header: "bg-emerald-500/10 hover:bg-emerald-500/15", icon: "text-emerald-600 dark:text-emerald-400", border: "border-l-4 border-l-emerald-500" },
-    timing:   { header: "bg-amber-500/10 hover:bg-amber-500/15",     icon: "text-amber-600 dark:text-amber-400",     border: "border-l-4 border-l-amber-500" },
+    region:   unifiedStyle,
+    audience: unifiedStyle,
+    message:  unifiedStyle,
+    timing:   unifiedStyle,
   };
 
   // Order: Region → Audience → Message → Timing
