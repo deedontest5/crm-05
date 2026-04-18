@@ -103,7 +103,8 @@ export function CampaignDashboard({ campaigns, getStrategyProgress }: CampaignDa
 
   const { data: aggregates } = useQuery({
     queryKey: ["campaign-aggregates"],
-    staleTime: 60_000,
+    staleTime: 5 * 60_000, // 5 min — bumps from 1 min so quick navigations don't refetch
+    gcTime: 10 * 60_000,
     queryFn: async () => {
       const { data, error } = await supabase.rpc("get_campaign_aggregates");
       if (error) throw error;
