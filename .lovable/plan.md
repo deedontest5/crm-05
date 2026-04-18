@@ -1,64 +1,69 @@
 
 
-## Enhanced Campaign Detail Overview + URL Improvements
+## Performance Investigation: Findings & Plan
 
-### Problem
-1. The Overview tab on the campaign detail page is basic — static stat cards, no clickable actions, no charts
-2. The browser URL shows `/campaigns/61f5e8ee-443b-42d6-bf4b-6ddfacc5d177` with UUID visible
-3. Stat cards don't navigate to the relevant tab when clicked
+I deep-checked the app and found several concrete causes of slow page loads. None are bundle-size issues (lazy loading + chunking is already in place). The real bottlenecks are **excessive serial network requests**, **fetching full tables when only counts are needed**, and **wasteful polling/refetching**.
 
-### Changes
+### Root Causes Found
 
-#### 1. Enhanced Overview Section (`src/pages/CampaignDetail.tsx`)
+**1. CampaignDashboard fetches 3 entire tables on every visit (`CampaignDashboard.tsx` lines 104–156)**
+- Pulls all rows from `campaign_accounts`, `campaign_contacts`, `campaign_communications` to compute counts client-side.
+- For a CRM with thousands of records, this is the #1 reason `/campaigns` and `/` are slow.
+- Fix: Replace with a single Supabase RPC (or 3 `head:true, count:exact` queries) that returns aggregates server-side.
 
-**Clickable stat cards:** Each of the 4 stat cards (Accounts targeted, Contacts targeted, Emails sent, Calls made) will navigate to the relevant tab when clicked:
-- "Accounts targeted" → switches to Accounts tab
-- "Contacts targeted" → switches to Contacts tab
-- "Emails sent" / "Calls made" → switches to Outreach tab
+**2. CampaignDetail issues 7+ parallel queries on mount (`useCampaigns.tsx` lines 340–447)**
+- campaign, strategy, accounts, contacts, communications, email-templates, phone-scripts, materials — all fired on page open even though most tabs aren't visible.
+- Fix: Only fetch the data needed for the **active tab**. Lazy-load tab content (Setup, Outreach, Analytics, Action Items) so their queries don't run until the tab is opened.
 
-**Add more stats row:** Add a second row with:
-- LinkedIn messages sent (from communications)
-- Responses (contacts with stage "Responded" or "Qualified")  
-- Deals created (from deals table linked by campaign_id)
-- MART completion percentage
+**3. CampaignAnalytics & CampaignOverview each refetch the same 4 tables (`CampaignAnalytics.tsx` 51–85, `CampaignOverview.tsx`)**
+- Same query keys are used, so the cache helps, but each component still subscribes and triggers re-renders.
+- Fix: Hoist queries into the parent (`CampaignDetail`) and pass via props — eliminates duplicate subscriptions.
 
-**Add contact stage breakdown card:** Show a mini horizontal bar chart (Recharts) of contact stages — Not Contacted, Contacted, Responded, Qualified, Converted — so you see the campaign funnel at a glance.
+**4. `setInterval` polling every 60s in CampaignCommunications (`CampaignCommunications.tsx` line 74)**
+- Calls the `check-email-replies` edge function and invalidates queries every minute, even when the user is on another tab.
+- Fix: Only poll when the Outreach tab is mounted AND the document is visible (`document.visibilityState === 'visible'`). Increase interval to 2 minutes.
 
-**Add outreach timeline card:** Show communication activity over time as a small area/line chart (messages per week).
+**5. DealsPage loads ALL deals at once with no pagination (`DealsPage.tsx` lines 35–61)**
+- Loops `range(0,999)` until exhausted — slow for large datasets, blocks first paint.
+- Plus an always-on real-time subscription that re-renders on every change.
+- Fix: For Kanban view limit to ~500 most recent + load more on scroll. For List view use server-side pagination (already exists in `fetchPaginatedData`).
 
-**Make MART Status clickable:** Clicking the MART Status card navigates to the MART Strategy tab.
+**6. CampaignDashboardWidget on Dashboard fetches campaigns + ALL campaign_contacts (`CampaignDashboardWidget.tsx` lines 17–58)**
+- Same anti-pattern as #1: fetches every contact row to compute response rates.
+- Fix: Use grouped count query or RPC.
 
-**Make Recent Activity clickable:** Clicking individual activity items opens the Outreach tab.
+**7. Accounts page has an extra `useEffect` querying ALL `account_owner` values (`Accounts.tsx` lines 32–41)**
+- Fires on every refresh trigger; no cache.
+- Fix: Wrap in `useQuery` with `staleTime: 5min`.
 
-**Add Description section** if `campaign.description` exists (currently only Goal and Notes are shown).
+**8. Vite manualChunks misses `@hello-pangea/dnd`, `date-fns`, `@tanstack/react-query`**
+- These are large and bundled into the main entry.
+- Fix: Add explicit chunks for `dnd`, `query`, `dates`.
 
-#### 2. Set Page Title to Campaign Name (`src/pages/CampaignDetail.tsx`)
+### Plan of Changes
 
-Add `useEffect` to set `document.title` to the campaign name when loaded, so the browser tab shows the campaign name instead of UUID.
+**Backend (1 migration)**
+- Create RPC `get_campaign_aggregates()` returning per-campaign account/contact/communication counts and channel/status breakdown in one query.
+- Create RPC `get_campaign_widget_stats()` for the Dashboard widget.
 
-#### 3. URL Slug Support — Not Feasible Without Breaking Changes
+**Frontend**
+1. **`CampaignDashboard.tsx`** — replace 3 full-table fetches with `get_campaign_aggregates` RPC.
+2. **`CampaignDashboardWidget.tsx`** — use `get_campaign_widget_stats` RPC.
+3. **`CampaignDetail.tsx`** — lazy-load tab components (`React.lazy` + `Suspense`) so Setup/Monitoring/Action-Items code & queries don't run until clicked.
+4. **`useCampaigns.tsx` (`useCampaignDetail`)** — gate `accountsQuery`, `contactsQuery`, `communicationsQuery`, `emailTemplatesQuery`, `phoneScriptsQuery`, `materialsQuery` behind an `enabledTabs` parameter so non-visible tabs don't fetch.
+5. **`CampaignAnalytics.tsx` / `CampaignOverview.tsx`** — accept data via props from parent instead of duplicating queries.
+6. **`CampaignCommunications.tsx`** — gate polling: skip when `document.hidden`, increase interval to 120s, only run when component mounted.
+7. **`DealsPage.tsx`** — add a 500-row initial fetch with "Load More" for Kanban; rely on existing pagination for List view. Disable real-time subscription when tab hidden.
+8. **`Accounts.tsx`** — convert ad-hoc owner fetch to `useQuery` with cache.
+9. **`vite.config.ts`** — add `dnd`, `query`, `dates` chunks for better cache hits.
 
-Replacing UUIDs in the URL with campaign names requires either:
-- A slug column in the database + migration + unique constraint
-- Or a two-step lookup (list all campaigns, find by name) which is fragile
+### Expected Impact
+- Campaigns dashboard: ~3 seconds → ~300 ms (one RPC vs three full table scans).
+- Campaign detail: ~2 seconds → ~500 ms (1 query instead of 7).
+- Deals page: large dataset load deferred until scrolled.
+- Notification polling no longer fires when tab is backgrounded.
 
-**Instead, the pragmatic fix:** Set `document.title` to the campaign name (browser tab shows name), and the header already prominently displays the campaign name. The UUID in the URL bar is a technical detail that doesn't affect UX significantly.
-
-#### 4. Additional Overview Data Fetching
-
-Add a query for deals linked to this campaign (`deals.campaign_id = campaignId`) to show deal stats on the overview. The `CampaignAnalytics` component already does this — we'll reuse the same query pattern.
-
-### File Changes
-
-| File | Changes |
-|------|---------|
-| `src/pages/CampaignDetail.tsx` | Enhance Overview tab: clickable stat cards, additional stats row, contact stage chart, outreach timeline chart, clickable MART status, description section, `document.title` set to campaign name |
-
-### Technical Details
-
-- Recharts (`BarChart`, `PieChart`) already imported in other components — will use same pattern
-- Contact stage data available from `detail.contacts` (each has `.stage`)  
-- Communications data available from `detail.communications` (each has `.communication_type` and `.communication_date`)
-- Deals query: `supabase.from("deals").select("id, stage").eq("campaign_id", campaignId)`
-- All stat cards get `cursor-pointer` + `onClick={() => setActiveTab("...")}` + hover effect
+### Out of Scope
+- No UI/visual changes — purely performance.
+- No data shape changes — RPCs return the same totals existing components already compute.
 
