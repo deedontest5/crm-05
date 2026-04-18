@@ -353,8 +353,7 @@ const DealsPage = () => {
 
   useEffect(() => {
     if (user) {
-      fetchDeals();
-
+      // useQuery already does the initial fetch — don't double-fetch on mount.
       // Set up real-time subscription — only when tab is visible to avoid
       // wasted re-renders when the user is on another tab.
       let channel: ReturnType<typeof supabase.channel> | null = null;

@@ -16,31 +16,25 @@ async function fetchDisplayNamesForIds(ids: string[]): Promise<Record<string, st
   const promise = (async () => {
     const result: Record<string, string> = {};
     try {
-      const { data: functionResult, error: functionError } = await supabase.functions.invoke(
-        'fetch-user-display-names',
-        { body: { userIds: ids } }
-      );
-      if (!functionError && functionResult?.userDisplayNames) {
-        Object.assign(result, functionResult.userDisplayNames);
-      } else {
-        const { data: profilesData } = await supabase
-          .from('profiles')
-          .select('id, full_name, "Email ID"')
-          .in('id', ids);
-        profilesData?.forEach((profile: any) => {
-          let displayName = "Unknown User";
-          if (
-            profile.full_name?.trim() &&
-            !profile.full_name.includes('@') &&
-            profile.full_name !== profile["Email ID"]
-          ) {
-            displayName = profile.full_name.trim();
-          } else if (profile["Email ID"]) {
-            displayName = profile["Email ID"].split('@')[0];
-          }
-          result[profile.id] = displayName;
-        });
-      }
+      // Direct query to profiles table — much faster than the edge function
+      // which calls auth.admin.listUsers() (returns ALL users every time).
+      const { data: profilesData } = await supabase
+        .from('profiles')
+        .select('id, full_name, "Email ID"')
+        .in('id', ids);
+      profilesData?.forEach((profile: any) => {
+        let displayName = "Unknown User";
+        if (
+          profile.full_name?.trim() &&
+          !profile.full_name.includes('@') &&
+          profile.full_name !== profile["Email ID"]
+        ) {
+          displayName = profile.full_name.trim();
+        } else if (profile["Email ID"]) {
+          displayName = profile["Email ID"].split('@')[0];
+        }
+        result[profile.id] = displayName;
+      });
       ids.forEach((id) => {
         if (!result[id]) result[id] = "Unknown User";
         displayNameCache.set(id, result[id]);
