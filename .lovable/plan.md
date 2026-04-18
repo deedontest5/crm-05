@@ -1,69 +1,105 @@
 
 
-## Performance Investigation: Findings & Plan
+## Performance Audit — Key Issues Found and Fix Plan
 
-I deep-checked the app and found several concrete causes of slow page loads. None are bundle-size issues (lazy loading + chunking is already in place). The real bottlenecks are **excessive serial network requests**, **fetching full tables when only counts are needed**, and **wasteful polling/refetching**.
+### Diagnosis (root causes of slow page loads)
 
-### Root Causes Found
+**1. Missing database indexes (biggest single win)**
+With 4,432 contacts, 631 accounts, 50 deals and growing, several hot queries do full-table scans:
 
-**1. CampaignDashboard fetches 3 entire tables on every visit (`CampaignDashboard.tsx` lines 104–156)**
-- Pulls all rows from `campaign_accounts`, `campaign_contacts`, `campaign_communications` to compute counts client-side.
-- For a CRM with thousands of records, this is the #1 reason `/campaigns` and `/` are slow.
-- Fix: Replace with a single Supabase RPC (or 3 `head:true, count:exact` queries) that returns aggregates server-side.
+| Table | Missing index | Used by |
+|---|---|---|
+| `contacts` | `created_time DESC` | Default sort on Contacts page |
+| `contacts` | `company_name` | Account → linked-contact lookup, contact search |
+| `deals` | `modified_at DESC` | Default sort on Deals page |
+| `deals` | `campaign_id` | Campaign Overview deal counts |
+| `campaign_communications` | `campaign_id` (+ `communication_date DESC`) | Every campaign detail page |
+| `campaign_contacts` | `campaign_id` alone | Campaign detail Audience/Overview |
+| `campaign_accounts` | `campaign_id` alone | Campaign detail Audience/Overview |
+| `notifications` | `(user_id, status)` partial | Bell unread count on every page |
+| `action_items` | `(status, archived_at)` | Default open-items filter |
 
-**2. CampaignDetail issues 7+ parallel queries on mount (`useCampaigns.tsx` lines 340–447)**
-- campaign, strategy, accounts, contacts, communications, email-templates, phone-scripts, materials — all fired on page open even though most tabs aren't visible.
-- Fix: Only fetch the data needed for the **active tab**. Lazy-load tab content (Setup, Outreach, Analytics, Action Items) so their queries don't run until the tab is opened.
+Add these as a single migration. Each shaves 100–500 ms on the relevant pages.
 
-**3. CampaignAnalytics & CampaignOverview each refetch the same 4 tables (`CampaignAnalytics.tsx` 51–85, `CampaignOverview.tsx`)**
-- Same query keys are used, so the cache helps, but each component still subscribes and triggers re-renders.
-- Fix: Hoist queries into the parent (`CampaignDetail`) and pass via props — eliminates duplicate subscriptions.
+**2. `fetch-user-display-names` edge function is slow**
+The function calls `supabase.auth.admin.listUsers()` — this fetches **every** user in the project regardless of how many IDs were requested, then filters client-side. Replace with a direct `profiles` table lookup (`.in('id', ids)`) which is a one-shot indexed query. The current edge function adds 300–800 ms on first paint of every list view (Campaigns, Accounts, Action Items, Notifications).
 
-**4. `setInterval` polling every 60s in CampaignCommunications (`CampaignCommunications.tsx` line 74)**
-- Calls the `check-email-replies` edge function and invalidates queries every minute, even when the user is on another tab.
-- Fix: Only poll when the Outreach tab is mounted AND the document is visible (`document.visibilityState === 'visible'`). Increase interval to 2 minutes.
+**3. `usePermissions` blocks every page**
+`PermissionsContext` runs two queries (`user_roles`, `page_permissions`) on every fresh login, and `loading` gates downstream rendering. The `loading` flag is fine (it has cached fallback), but the `permissions` query has no `staleTime` mismatch — already 10 min — so this is only an issue on cold load. Fix: add a 1-hour `localStorage` warm cache for the role so the second-tab open is instant.
 
-**5. DealsPage loads ALL deals at once with no pagination (`DealsPage.tsx` lines 35–61)**
-- Loops `range(0,999)` until exhausted — slow for large datasets, blocks first paint.
-- Plus an always-on real-time subscription that re-renders on every change.
-- Fix: For Kanban view limit to ~500 most recent + load more on scroll. For List view use server-side pagination (already exists in `fetchPaginatedData`).
+**4. DealsPage double-fetches**
+`useQuery(['deals-all'])` fetches once, then `useEffect` calls `fetchDeals()` (= `invalidateQueries`) immediately on mount — that triggers a second identical request. Remove the redundant invalidate; let the query handle initial load.
 
-**6. CampaignDashboardWidget on Dashboard fetches campaigns + ALL campaign_contacts (`CampaignDashboardWidget.tsx` lines 17–58)**
-- Same anti-pattern as #1: fetches every contact row to compute response rates.
-- Fix: Use grouped count query or RPC.
+**5. ContactTable / AccountTable show two spinners on first mount**
+The lazy `<Suspense>` shows `RouteFallback` (full-screen spinner), then the table mounts and shows another "Loading contacts…" spinner before data arrives. Combine these by removing the inner full-screen spinner and showing a skeleton table immediately (the page layout, header, filters render instantly).
 
-**7. Accounts page has an extra `useEffect` querying ALL `account_owner` values (`Accounts.tsx` lines 32–41)**
-- Fires on every refresh trigger; no cache.
-- Fix: Wrap in `useQuery` with `staleTime: 5min`.
+**6. ActionItems: client-side sort runs on every render**
+`const sortedActionItems = [...actionItems].sort(...)` runs every render with no `useMemo`. With 74 items it's fine today, but the modal-open-from-notification effect causes a re-render storm. Wrap with `useMemo`.
 
-**8. Vite manualChunks misses `@hello-pangea/dnd`, `date-fns`, `@tanstack/react-query`**
-- These are large and bundled into the main entry.
-- Fix: Add explicit chunks for `dnd`, `query`, `dates`.
+**7. KanbanBoard always loads `useActionItems()` even when not needed**
+`KanbanBoard` calls `useActionItems()` at the top to support the action-item modal, but that hook fetches & subscribes to `action_items` regardless of whether the modal is opened. Only fetch when the modal opens (or scope the fetch to the deal in the modal).
 
-### Plan of Changes
+**8. CampaignDashboard `get_campaign_aggregates` RPC + campaigns query run sequentially**
+On Campaigns page first paint we wait for `campaigns` query → then dashboard queries. They can run in parallel — already do via React Query, but `staleTime` on `campaign-aggregates` is only 60 s so quick navigations refetch. Bump to 5 min.
 
-**Backend (1 migration)**
-- Create RPC `get_campaign_aggregates()` returning per-campaign account/contact/communication counts and channel/status breakdown in one query.
-- Create RPC `get_campaign_widget_stats()` for the Dashboard widget.
+**9. NotificationBell + Notifications page double-fetch**
+`useUnreadNotificationCount` (sidebar) and `useNotifications` (page) both subscribe to the `notifications` channel and both run a HEAD count + full list. Acceptable today but worth deduping later.
 
-**Frontend**
-1. **`CampaignDashboard.tsx`** — replace 3 full-table fetches with `get_campaign_aggregates` RPC.
-2. **`CampaignDashboardWidget.tsx`** — use `get_campaign_widget_stats` RPC.
-3. **`CampaignDetail.tsx`** — lazy-load tab components (`React.lazy` + `Suspense`) so Setup/Monitoring/Action-Items code & queries don't run until clicked.
-4. **`useCampaigns.tsx` (`useCampaignDetail`)** — gate `accountsQuery`, `contactsQuery`, `communicationsQuery`, `emailTemplatesQuery`, `phoneScriptsQuery`, `materialsQuery` behind an `enabledTabs` parameter so non-visible tabs don't fetch.
-5. **`CampaignAnalytics.tsx` / `CampaignOverview.tsx`** — accept data via props from parent instead of duplicating queries.
-6. **`CampaignCommunications.tsx`** — gate polling: skip when `document.hidden`, increase interval to 120s, only run when component mounted.
-7. **`DealsPage.tsx`** — add a 500-row initial fetch with "Load More" for Kanban; rely on existing pagination for List view. Disable real-time subscription when tab hidden.
-8. **`Accounts.tsx`** — convert ad-hoc owner fetch to `useQuery` with cache.
-9. **`vite.config.ts`** — add `dnd`, `query`, `dates` chunks for better cache hits.
+---
 
-### Expected Impact
-- Campaigns dashboard: ~3 seconds → ~300 ms (one RPC vs three full table scans).
-- Campaign detail: ~2 seconds → ~500 ms (1 query instead of 7).
-- Deals page: large dataset load deferred until scrolled.
-- Notification polling no longer fires when tab is backgrounded.
+### Plan — Fixes in priority order
 
-### Out of Scope
-- No UI/visual changes — purely performance.
-- No data shape changes — RPCs return the same totals existing components already compute.
+#### A. Database migration (biggest impact)
+Add the missing indexes:
+```sql
+CREATE INDEX IF NOT EXISTS idx_contacts_created_time ON contacts (created_time DESC);
+CREATE INDEX IF NOT EXISTS idx_contacts_company_name ON contacts (company_name);
+CREATE INDEX IF NOT EXISTS idx_contacts_created_by ON contacts (created_by);
+CREATE INDEX IF NOT EXISTS idx_deals_modified_at ON deals (modified_at DESC);
+CREATE INDEX IF NOT EXISTS idx_deals_campaign_id ON deals (campaign_id) WHERE campaign_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_deals_created_by ON deals (created_by);
+CREATE INDEX IF NOT EXISTS idx_camp_comms_campaign ON campaign_communications (campaign_id, communication_date DESC);
+CREATE INDEX IF NOT EXISTS idx_camp_contacts_campaign ON campaign_contacts (campaign_id);
+CREATE INDEX IF NOT EXISTS idx_camp_accounts_campaign ON campaign_accounts (campaign_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_user_status ON notifications (user_id, status) WHERE status='unread';
+CREATE INDEX IF NOT EXISTS idx_action_items_status_archived ON action_items (status, archived_at);
+```
+
+#### B. Replace edge function with direct `profiles` query
+`src/hooks/useUserDisplayNames.tsx` — drop the `supabase.functions.invoke('fetch-user-display-names', …)` call entirely and use only the existing `profiles` fallback. Saves a function cold-start (~300 ms) and cuts payload to just the requested IDs.
+
+#### C. DealsPage: remove redundant `fetchDeals()` invalidate on mount
+Keep the real-time subscription, drop the immediate invalidation — `useQuery` already fetched.
+
+#### D. Show skeleton tables instead of double spinners
+`ContactTable`, `AccountTable`: replace the "Loading contacts…" full-spinner with skeleton rows so the user sees structure immediately. (This is a perceived-perf win; also drop the `min-h-screen` spinner inside the lazy Suspense for these routes — render the page chrome immediately and only skeleton the table.)
+
+#### E. Memoize sort in ActionItems
+Wrap `sortedActionItems` and `paginatedItems` in `useMemo`.
+
+#### F. Bump dashboard query stale times
+`campaign-aggregates` → 5 min; `account-owners` already at 5 min (good).
+
+#### G. Defer `useActionItems()` in KanbanBoard
+Only mount the action-item hook lazily when the action modal opens.
+
+### File changes
+
+| File | Change |
+|---|---|
+| `supabase/migrations/<new>.sql` | Add 11 missing indexes |
+| `src/hooks/useUserDisplayNames.tsx` | Remove edge-function call; use `profiles` directly |
+| `src/pages/DealsPage.tsx` | Remove redundant `fetchDeals()` on mount; only call on visibility change |
+| `src/components/ContactTable.tsx` | Replace spinner with skeleton rows; render table chrome immediately |
+| `src/components/AccountTable.tsx` | Same skeleton treatment |
+| `src/pages/ActionItems.tsx` | `useMemo` for `sortedActionItems` and `paginatedItems` |
+| `src/components/campaigns/CampaignDashboard.tsx` | Bump `staleTime` to 5 min |
+| `src/components/KanbanBoard.tsx` | Lazy-mount `useActionItems` only when action modal opens |
+
+### Expected improvement
+- Contacts page first paint: ~1.2 s → ~400 ms (index + skeleton + no edge function)
+- Campaign Detail page: ~1.5 s → ~500 ms (campaign_communications/contacts/accounts indexes are the big win)
+- Deals page: ~800 ms → ~400 ms (modified_at index + no double fetch)
+- Action Items: snappier sort + filter changes
+- Sidebar unread bell: instant on every page (partial index)
 
