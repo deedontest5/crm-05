@@ -103,59 +103,53 @@ export function CampaignDashboard({ campaigns, getStrategyProgress }: CampaignDa
 
   const { data: aggregates } = useQuery({
     queryKey: ["campaign-aggregates"],
-    staleTime: 5 * 60_000, // 5 min — bumps from 1 min so quick navigations don't refetch
-    gcTime: 10 * 60_000,
+    staleTime: 60_000,
     queryFn: async () => {
-      const { data, error } = await supabase.rpc("get_campaign_aggregates");
-      if (error) throw error;
-      const rows = (data || []) as Array<{
-        campaign_id: string;
-        accounts_count: number;
-        contacts_count: number;
-        communications_count: number;
-        email_count: number;
-        call_count: number;
-        phone_count: number;
-        linkedin_count: number;
-        email_sent: number;
-        email_replied: number;
-        email_failed: number;
-        replies_count: number;
-      }>;
+      const [accRes, conRes, comRes] = await Promise.all([
+        supabase.from("campaign_accounts").select("campaign_id"),
+        supabase.from("campaign_contacts").select("campaign_id"),
+        supabase.from("campaign_communications").select("campaign_id,communication_type,email_status"),
+      ]);
+      const countBy = (rows: { campaign_id: string }[] | null) => {
+        const map: Record<string, number> = {};
+        (rows || []).forEach((r) => { map[r.campaign_id] = (map[r.campaign_id] || 0) + 1; });
+        return map;
+      };
+      const accountsBycamp = countBy(accRes.data as any);
+      const contactsBycamp = countBy(conRes.data as any);
+      const commsBycamp = countBy(comRes.data as any);
 
-      const accountsBycamp: Record<string, number> = {};
-      const contactsBycamp: Record<string, number> = {};
-      const commsBycamp: Record<string, number> = {};
-      const repliesBycamp: Record<string, number> = {};
-      const sentBycamp: Record<string, number> = {};
       const channelCounts: Record<string, number> = { Email: 0, Call: 0, LinkedIn: 0, Other: 0 };
       const emailStatus = { Sent: 0, Replied: 0, Failed: 0 };
-      let totalAccounts = 0, totalContacts = 0, totalComms = 0;
+      const repliesBycamp: Record<string, number> = {};
+      const sentBycamp: Record<string, number> = {};
 
-      rows.forEach((r) => {
-        const id = r.campaign_id;
-        accountsBycamp[id] = Number(r.accounts_count) || 0;
-        contactsBycamp[id] = Number(r.contacts_count) || 0;
-        commsBycamp[id] = Number(r.communications_count) || 0;
-        sentBycamp[id] = Number(r.email_count) || 0;
-        repliesBycamp[id] = Number(r.email_replied) || 0;
+      (comRes.data || []).forEach((r: any) => {
+        const t = r.communication_type;
+        if (t === "Email") channelCounts.Email++;
+        else if (t === "Call" || t === "Phone") channelCounts.Call++;
+        else if (t === "LinkedIn") channelCounts.LinkedIn++;
+        else channelCounts.Other++;
 
-        totalAccounts += accountsBycamp[id];
-        totalContacts += contactsBycamp[id];
-        totalComms += commsBycamp[id];
-
-        channelCounts.Email += Number(r.email_count) || 0;
-        channelCounts.Call += (Number(r.call_count) || 0) + (Number(r.phone_count) || 0);
-        channelCounts.LinkedIn += Number(r.linkedin_count) || 0;
-
-        emailStatus.Sent += Number(r.email_sent) || 0;
-        emailStatus.Replied += Number(r.email_replied) || 0;
-        emailStatus.Failed += Number(r.email_failed) || 0;
+        if (t === "Email") {
+          sentBycamp[r.campaign_id] = (sentBycamp[r.campaign_id] || 0) + 1;
+          const s = (r.email_status || "").toLowerCase();
+          if (s === "replied") {
+            emailStatus.Replied++;
+            repliesBycamp[r.campaign_id] = (repliesBycamp[r.campaign_id] || 0) + 1;
+          } else if (s === "failed" || s === "bounced") {
+            emailStatus.Failed++;
+          } else {
+            emailStatus.Sent++;
+          }
+        }
       });
 
       return {
         accountsBycamp, contactsBycamp, commsBycamp,
-        totalAccounts, totalContacts, totalComms,
+        totalAccounts: accRes.data?.length || 0,
+        totalContacts: conRes.data?.length || 0,
+        totalComms: comRes.data?.length || 0,
         channelCounts, emailStatus, repliesBycamp, sentBycamp,
       };
     },

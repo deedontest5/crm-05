@@ -145,15 +145,6 @@ export function CampaignStrategy({ campaignId, campaign, isStrategyComplete, upd
     timing: <Clock className="h-4 w-4" />,
   };
 
-  // Unified header styling — all sections use the Region (blue) theme
-  const unifiedStyle = { header: "bg-blue-500/10 hover:bg-blue-500/15", icon: "text-blue-600 dark:text-blue-400", border: "border-l-4 border-l-blue-500" };
-  const sectionStyles: Record<string, { header: string; icon: string; border: string }> = {
-    region:   unifiedStyle,
-    audience: unifiedStyle,
-    message:  unifiedStyle,
-    timing:   unifiedStyle,
-  };
-
   // Order: Region → Audience → Message → Timing
   const sections = [
     { key: "region", label: "Region", flag: "region_done", done: isStrategyComplete.region },
@@ -179,14 +170,14 @@ export function CampaignStrategy({ campaignId, campaign, isStrategyComplete, upd
           return (
             <Collapsible key={section.key} open={isOpen} onOpenChange={() => toggleSection(section.key)}>
               <CollapsibleTrigger asChild>
-                <div className={`py-2 px-3 cursor-pointer transition-colors ${sectionStyles[section.key].header} ${sectionStyles[section.key].border}`}>
+                <div className="py-2 px-3 cursor-pointer hover:bg-muted/30 transition-colors">
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2 min-w-0">
                       {section.done
                         ? <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />
                         : <Circle className="h-4 w-4 text-muted-foreground shrink-0" />}
-                      <span className={sectionStyles[section.key].icon}>{sectionIcons[section.key]}</span>
-                      <span className="text-sm font-semibold">{section.label}</span>
+                      {sectionIcons[section.key]}
+                      <span className="text-sm font-medium">{section.label}</span>
                       {!isOpen && (() => {
                         const summary = getContentSummary(section.key);
                         return summary ? (

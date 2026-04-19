@@ -27,9 +27,6 @@ export default defineConfig(({ mode }) => ({
             if (id.includes('recharts') || id.includes('d3-')) return 'recharts';
             if (id.includes('lucide-react')) return 'lucide';
             if (id.includes('@radix-ui')) return 'radix';
-            if (id.includes('@hello-pangea/dnd') || id.includes('react-beautiful-dnd')) return 'dnd';
-            if (id.includes('@tanstack/react-query')) return 'query';
-            if (id.includes('date-fns')) return 'dates';
           }
         },
       },

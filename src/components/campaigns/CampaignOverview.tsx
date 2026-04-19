@@ -228,53 +228,41 @@ export function CampaignOverview({
     {
       label: "Accounts", value: accounts.length, icon: Building2,
       onClick: () => onTabChange("setup"),
-      borderColor: "border-l-muted-foreground/30",
-      iconBg: "bg-muted",
-      iconColor: "text-muted-foreground",
-      valueColor: "text-foreground",
+      borderColor: "border-l-blue-500", iconBg: "bg-blue-100 dark:bg-blue-900/30",
+      iconColor: "text-blue-600 dark:text-blue-400", valueColor: "text-foreground",
     },
     {
       label: "Contacts", value: contacts.length, icon: Users,
       onClick: () => onTabChange("setup"),
-      borderColor: "border-l-muted-foreground/30",
-      iconBg: "bg-muted",
-      iconColor: "text-muted-foreground",
-      valueColor: "text-foreground",
+      borderColor: "border-l-emerald-500", iconBg: "bg-emerald-100 dark:bg-emerald-900/30",
+      iconColor: "text-emerald-600 dark:text-emerald-400", valueColor: "text-foreground",
     },
     {
       label: "Outreach", value: outreachTotal, icon: MessageSquare,
       sub: `${emailCount} ✉ · ${callCount} ☎ · ${linkedinCount} in`,
       onClick: () => onTabChange("monitoring"),
-      borderColor: "border-l-muted-foreground/30",
-      iconBg: "bg-muted",
-      iconColor: "text-muted-foreground",
-      valueColor: "text-foreground",
+      borderColor: "border-l-purple-500", iconBg: "bg-purple-100 dark:bg-purple-900/30",
+      iconColor: "text-purple-600 dark:text-purple-400", valueColor: "text-foreground",
     },
     {
       label: "Responses", value: responseCount, icon: TrendingUp,
       sub: contacts.length > 0 ? `${Math.round((responseCount / contacts.length) * 100)}% rate` : undefined,
-      borderColor: "border-l-muted-foreground/30",
-      iconBg: "bg-muted",
-      iconColor: "text-muted-foreground",
-      valueColor: "text-foreground",
+      borderColor: "border-l-amber-500", iconBg: "bg-amber-100 dark:bg-amber-900/30",
+      iconColor: "text-amber-600 dark:text-amber-400", valueColor: "text-foreground",
     },
     {
       label: "Deals", value: deals.length, icon: BarChart3,
       sub: totalDealValue > 0 ? `€${totalDealValue.toLocaleString()}` : undefined,
       onClick: () => onTabChange("monitoring"),
-      borderColor: "border-l-muted-foreground/30",
-      iconBg: "bg-muted",
-      iconColor: "text-muted-foreground",
-      valueColor: "text-foreground",
+      borderColor: "border-l-indigo-500", iconBg: "bg-indigo-100 dark:bg-indigo-900/30",
+      iconColor: "text-indigo-600 dark:text-indigo-400", valueColor: "text-foreground",
     },
     {
       label: "Setup", value: `${strategyProgress}/4`, icon: Target,
       sub: `${Math.round((strategyProgress / 4) * 100)}% done`,
       onClick: () => onTabChange("setup"),
-      borderColor: "border-l-muted-foreground/30",
-      iconBg: "bg-muted",
-      iconColor: "text-muted-foreground",
-      valueColor: "text-foreground",
+      borderColor: "border-l-rose-500", iconBg: "bg-rose-100 dark:bg-rose-900/30",
+      iconColor: "text-rose-600 dark:text-rose-400", valueColor: "text-foreground",
     },
   ];
 
@@ -312,13 +300,15 @@ export function CampaignOverview({
       {/* Engagement Funnel + Channel Mix */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
         {/* Engagement Funnel */}
-        <Card className="lg:col-span-7">
+        <Card className="lg:col-span-7 border-l-4 border-l-emerald-500">
           <CardHeader className="pb-3">
             <CardTitle
               className="text-base font-semibold flex items-center gap-2 cursor-pointer hover:text-primary transition-colors"
               onClick={() => onTabChange("setup")}
             >
-              <Layers className="h-4 w-4 text-muted-foreground" />
+              <div className="h-8 w-8 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
+                <Layers className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+              </div>
               Engagement Funnel
               <ArrowRight className="h-4 w-4 ml-auto opacity-60" />
             </CardTitle>
@@ -358,10 +348,12 @@ export function CampaignOverview({
         </Card>
 
         {/* Channel Mix Donut */}
-        <Card className="lg:col-span-5">
+        <Card className="lg:col-span-5 border-l-4 border-l-blue-500">
           <CardHeader className="pb-3">
             <CardTitle className="text-base font-semibold flex items-center gap-2">
-              <Activity className="h-4 w-4 text-muted-foreground" />
+              <div className="h-8 w-8 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+                <Activity className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+              </div>
               Outreach Channel Mix
             </CardTitle>
           </CardHeader>

@@ -1803,24 +1803,6 @@ export type Database = {
         Args: { _campaign_id: string }
         Returns: undefined
       }
-      get_campaign_aggregates: {
-        Args: never
-        Returns: {
-          accounts_count: number
-          call_count: number
-          campaign_id: string
-          communications_count: number
-          contacts_count: number
-          email_count: number
-          email_failed: number
-          email_replied: number
-          email_sent: number
-          linkedin_count: number
-          phone_count: number
-          replies_count: number
-        }[]
-      }
-      get_campaign_widget_stats: { Args: never; Returns: Json }
       get_user_role: { Args: { p_user_id: string }; Returns: string }
       is_current_user_admin: { Args: never; Returns: boolean }
       is_user_admin: { Args: { user_id?: string }; Returns: boolean }

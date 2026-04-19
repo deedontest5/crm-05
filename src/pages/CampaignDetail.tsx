@@ -1,7 +1,7 @@
 import { useParams, useNavigate } from "react-router-dom";
-import { useCampaignDetail, useCampaigns, type CampaignDetailEnabledTabs } from "@/hooks/useCampaigns";
+import { useCampaignDetail, useCampaigns } from "@/hooks/useCampaigns";
 import { useUserDisplayNames } from "@/hooks/useUserDisplayNames";
-import { useState, useMemo, useEffect, useRef, lazy, Suspense } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -20,28 +20,11 @@ import {
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { CampaignModal } from "@/components/campaigns/CampaignModal";
+import { CampaignStrategy } from "@/components/campaigns/CampaignStrategy";
+import { CampaignCommunications } from "@/components/campaigns/CampaignCommunications";
+import { CampaignAnalytics } from "@/components/campaigns/CampaignAnalytics";
+import { CampaignActionItems } from "@/components/campaigns/CampaignActionItems";
 import { CampaignOverview } from "@/components/campaigns/CampaignOverview";
-
-// Lazy-load heavy tab content so its code & queries don't run until the tab is opened
-const CampaignStrategy = lazy(() =>
-  import("@/components/campaigns/CampaignStrategy").then((m) => ({ default: m.CampaignStrategy }))
-);
-const CampaignCommunications = lazy(() =>
-  import("@/components/campaigns/CampaignCommunications").then((m) => ({ default: m.CampaignCommunications }))
-);
-const CampaignAnalytics = lazy(() =>
-  import("@/components/campaigns/CampaignAnalytics").then((m) => ({ default: m.CampaignAnalytics }))
-);
-const CampaignActionItems = lazy(() =>
-  import("@/components/campaigns/CampaignActionItems").then((m) => ({ default: m.CampaignActionItems }))
-);
-
-const TabFallback = () => (
-  <div className="space-y-3 py-2">
-    <div className="h-24 rounded-lg bg-muted animate-pulse" />
-    <div className="h-48 rounded-lg bg-muted animate-pulse" />
-  </div>
-);
 
 const statusColors: Record<string, string> = {
   Draft: "bg-muted text-muted-foreground",
@@ -73,18 +56,12 @@ export default function CampaignDetail() {
     return extractedId;
   }, [extractedId, isDirectUUID, rawId, campaigns]);
 
-  const [activeTab, setActiveTab] = useState("overview");
-  const enabledTabs = useMemo<CampaignDetailEnabledTabs>(() => ({
-    overview: true, // always needed for the default landing tab
-    setup: activeTab === "setup",
-    monitoring: activeTab === "monitoring",
-    actionItems: activeTab === "actionItems",
-  }), [activeTab]);
-  const detail = useCampaignDetail(id, enabledTabs);
+  const detail = useCampaignDetail(id);
   const { updateCampaign, deleteCampaign, archiveCampaign, cloneCampaign } = useCampaigns();
   const ownerIds = useMemo(() => [detail.campaign?.owner].filter(Boolean) as string[], [detail.campaign?.owner]);
   const { displayNames } = useUserDisplayNames(ownerIds);
   const [editOpen, setEditOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState("overview");
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [archiveOpen, setArchiveOpen] = useState(false);
   const autoCompleteRef = useRef(false);
@@ -261,29 +238,27 @@ export default function CampaignDetail() {
             </TabsContent>
 
             <TabsContent value="setup" className="mt-0">
-              <Suspense fallback={<TabFallback />}>
-                <CampaignStrategy
-                  campaignId={campaign.id}
-                  campaign={campaign}
-                  isStrategyComplete={isStrategyComplete}
-                  updateStrategyFlag={detail.updateStrategyFlag}
-                  isCampaignEnded={isCampaignEnded}
-                  daysRemaining={daysRemaining}
-                  timingNotes={detail.strategy?.timing_notes}
-                  campaignName={campaign.campaign_name}
-                  campaignOwner={campaign.owner}
-                  endDate={campaign.end_date}
-                  contentCounts={{
-                    emailTemplateCount: detail.emailTemplates.filter(t => t.email_type !== "LinkedIn-Connection" && t.email_type !== "LinkedIn-Followup").length,
-                    phoneScriptCount: detail.phoneScripts.length,
-                    linkedinTemplateCount: detail.emailTemplates.filter(t => t.email_type === "LinkedIn-Connection" || t.email_type === "LinkedIn-Followup").length,
-                    materialCount: detail.materials.length,
-                    regionCount: (() => { try { const arr = JSON.parse(campaign.region || ""); return Array.isArray(arr) ? arr.length : 0; } catch { return campaign.region ? 1 : 0; } })(),
-                    accountCount: detail.accounts.length,
-                    contactCount: detail.contacts.length,
-                  }}
-                />
-              </Suspense>
+              <CampaignStrategy
+                campaignId={campaign.id}
+                campaign={campaign}
+                isStrategyComplete={isStrategyComplete}
+                updateStrategyFlag={detail.updateStrategyFlag}
+                isCampaignEnded={isCampaignEnded}
+                daysRemaining={daysRemaining}
+                timingNotes={detail.strategy?.timing_notes}
+                campaignName={campaign.campaign_name}
+                campaignOwner={campaign.owner}
+                endDate={campaign.end_date}
+                contentCounts={{
+                  emailTemplateCount: detail.emailTemplates.filter(t => t.email_type !== "LinkedIn-Connection" && t.email_type !== "LinkedIn-Followup").length,
+                  phoneScriptCount: detail.phoneScripts.length,
+                  linkedinTemplateCount: detail.emailTemplates.filter(t => t.email_type === "LinkedIn-Connection" || t.email_type === "LinkedIn-Followup").length,
+                  materialCount: detail.materials.length,
+                  regionCount: (() => { try { const arr = JSON.parse(campaign.region || ""); return Array.isArray(arr) ? arr.length : 0; } catch { return campaign.region ? 1 : 0; } })(),
+                  accountCount: detail.accounts.length,
+                  contactCount: detail.contacts.length,
+                }}
+              />
             </TabsContent>
 
             <TabsContent value="monitoring" className="mt-0">
@@ -293,22 +268,16 @@ export default function CampaignDetail() {
                   <TabsTrigger value="analytics" className="text-xs h-7">Analytics</TabsTrigger>
                 </TabsList>
                 <TabsContent value="outreach" className="mt-0">
-                  <Suspense fallback={<TabFallback />}>
-                    <CampaignCommunications campaignId={campaign.id} isCampaignEnded={isCampaignEnded} />
-                  </Suspense>
+                  <CampaignCommunications campaignId={campaign.id} isCampaignEnded={isCampaignEnded} />
                 </TabsContent>
                 <TabsContent value="analytics" className="mt-0">
-                  <Suspense fallback={<TabFallback />}>
-                    <CampaignAnalytics campaignId={campaign.id} />
-                  </Suspense>
+                  <CampaignAnalytics campaignId={campaign.id} />
                 </TabsContent>
               </Tabs>
             </TabsContent>
 
             <TabsContent value="actionItems" className="mt-0">
-              <Suspense fallback={<TabFallback />}>
-                <CampaignActionItems campaignId={campaign.id} />
-              </Suspense>
+              <CampaignActionItems campaignId={campaign.id} />
             </TabsContent>
           </div>
         </Tabs>
