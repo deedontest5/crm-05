@@ -360,7 +360,13 @@ export function useCampaigns(options: UseCampaignsOptions = {}) {
         );
       }
 
-      return newId;
+      // Re-read the slug after the DB trigger generated it.
+      const { data: cloned } = await supabase
+        .from("campaigns")
+        .select("id, slug, campaign_name")
+        .eq("id", newId)
+        .maybeSingle();
+      return { id: newId, slug: cloned?.slug ?? null, campaign_name: cloned?.campaign_name ?? null };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["campaigns"] });
