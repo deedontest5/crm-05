@@ -454,8 +454,9 @@ export default function Campaigns() {
           getStrategyDetail={getStrategyDetail}
           onEdit={(c) => { setEditCampaign(c); setModalOpen(true); }}
           onClone={(id) => {
-            cloneCampaign.mutateAsync(id).then((newId) => {
-              if (newId) navigate(`/campaigns/${newId}`);
+            cloneCampaign.mutateAsync(id).then((res) => {
+              if (res?.slug) navigate(`/campaigns/${res.slug}`);
+              else if (res?.id) navigate(`/campaigns/${res.id}`);
             });
           }}
           onArchive={(id) => setArchiveId(id)}
