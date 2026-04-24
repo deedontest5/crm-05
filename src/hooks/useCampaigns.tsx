@@ -133,6 +133,8 @@ export function useCampaigns(options: UseCampaignsOptions = {}) {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["campaigns"] });
       queryClient.invalidateQueries({ queryKey: ["campaign", data.id] });
+      queryClient.invalidateQueries({ queryKey: ["campaign-primary-channel", data.id] });
+      queryClient.invalidateQueries({ queryKey: ["campaign-meta-table", data.id] });
       toast({ title: "Campaign updated successfully" });
     },
     onError: (error: Error) => {
@@ -360,7 +362,13 @@ export function useCampaigns(options: UseCampaignsOptions = {}) {
         );
       }
 
-      return newId;
+      // Re-read the slug after the DB trigger generated it.
+      const { data: cloned } = await supabase
+        .from("campaigns")
+        .select("id, slug, campaign_name")
+        .eq("id", newId)
+        .maybeSingle();
+      return { id: newId, slug: cloned?.slug ?? null, campaign_name: cloned?.campaign_name ?? null };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["campaigns"] });

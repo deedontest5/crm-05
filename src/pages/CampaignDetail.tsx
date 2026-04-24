@@ -40,9 +40,6 @@ const CampaignAnalytics = lazy(() =>
 const CampaignActionItems = lazy(() =>
   import("@/components/campaigns/CampaignActionItems").then((m) => ({ default: m.CampaignActionItems }))
 );
-const ReplyHealthDashboard = lazy(() =>
-  import("@/components/campaigns/ReplyHealthDashboard").then((m) => ({ default: m.ReplyHealthDashboard }))
-);
 
 const TabFallback = () => (
   <div className="space-y-3 py-2">
@@ -310,7 +307,7 @@ export default function CampaignDetail() {
                 <DropdownMenuItem onClick={() => setEditOpen(true)}>
                   <Pencil className="h-3.5 w-3.5 mr-2" /> Edit
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => cloneCampaign.mutateAsync(campaign.id).then((newId) => { if (newId) { const slug = (campaign.campaign_name + " (Copy)").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""); navigate(`/campaigns/${slug}`); } })}>
+                <DropdownMenuItem onClick={() => cloneCampaign.mutateAsync(campaign.id).then((res) => { if (res?.slug) navigate(`/campaigns/${res.slug}`); else if (res?.id) navigate(`/campaigns/${res.id}`); })}>
                   <Copy className="h-3.5 w-3.5 mr-2" /> Clone
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setArchiveOpen(true)}>
@@ -338,7 +335,6 @@ export default function CampaignDetail() {
             <TabsTrigger value="overview" className="text-sm font-medium h-10 px-4 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none">Overview</TabsTrigger>
             <TabsTrigger value="setup" className="text-sm font-medium h-10 px-4 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none">Setup</TabsTrigger>
             <TabsTrigger value="monitoring" className="text-sm font-medium h-10 px-4 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none">Monitoring</TabsTrigger>
-            <TabsTrigger value="replyHealth" className="text-sm font-medium h-10 px-4 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none">Reply Health</TabsTrigger>
             <TabsTrigger value="actionItems" className="text-sm font-medium h-10 px-4 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none">Action Items</TabsTrigger>
           </TabsList>
 
@@ -434,12 +430,6 @@ export default function CampaignDetail() {
                   </Suspense>
                 </div>
               )}
-            </TabsContent>
-
-            <TabsContent value="replyHealth" className="mt-0">
-              <Suspense fallback={<TabFallback />}>
-                <ReplyHealthDashboard campaignId={campaign.id} />
-              </Suspense>
             </TabsContent>
 
             <TabsContent value="actionItems" className="mt-0">

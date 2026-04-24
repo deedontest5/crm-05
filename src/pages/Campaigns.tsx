@@ -454,8 +454,9 @@ export default function Campaigns() {
           getStrategyDetail={getStrategyDetail}
           onEdit={(c) => { setEditCampaign(c); setModalOpen(true); }}
           onClone={(id) => {
-            cloneCampaign.mutateAsync(id).then((newId) => {
-              if (newId) navigate(`/campaigns/${newId}`);
+            cloneCampaign.mutateAsync(id).then((res) => {
+              if (res?.slug) navigate(`/campaigns/${res.slug}`);
+              else if (res?.id) navigate(`/campaigns/${res.id}`);
             });
           }}
           onArchive={(id) => setArchiveId(id)}
@@ -625,8 +626,9 @@ export default function Campaigns() {
                                       variant="ghost"
                                       size="icon"
                                       className="h-8 w-8"
-                                      onClick={() => cloneCampaign.mutateAsync(campaign.id).then((newId) => {
-                                        if (newId) navigate(`/campaigns/${newId}`);
+                                      onClick={() => cloneCampaign.mutateAsync(campaign.id).then((res) => {
+                                        if (res?.slug) navigate(`/campaigns/${res.slug}`);
+                                        else if (res?.id) navigate(`/campaigns/${res.id}`);
                                       })}
                                     >
                                       <Copy className="h-4 w-4 text-muted-foreground" />
