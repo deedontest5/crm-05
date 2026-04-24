@@ -288,6 +288,16 @@ export function CampaignCommunications({ campaignId, isCampaignEnded, viewMode, 
   });
   const primaryChannel = (campaignMeta?.primary_channel || "").trim();
 
+  // Snap channel tab to a visible one when campaign is restricted to a single channel.
+  useEffect(() => {
+    if (!primaryChannel) return;
+    const allowed: OutreachTab =
+      primaryChannel === "Email" ? "email" :
+      primaryChannel === "LinkedIn" ? "linkedin" :
+      (primaryChannel === "Phone" || primaryChannel === "Call") ? "call" : outreachTab;
+    if (allowed !== outreachTab) setOutreachTab(allowed);
+  }, [primaryChannel]);
+
   // Note: per-contact outreach timeline is fetched inside the Log Outreach modal
   // (see logForm.contact_id-keyed useQuery below `logForm` declaration).
 
