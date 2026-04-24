@@ -649,9 +649,9 @@ export function CampaignMessage({ campaignId, campaign, selectedRegions = [], au
       {/* Unified toolbar */}
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-3 text-xs text-muted-foreground">
-          <Tooltip><TooltipTrigger asChild><span className="inline-flex items-center gap-1"><Mail className="h-3.5 w-3.5" /><span className="font-medium text-foreground">{regularEmailTemplates.length}</span></span></TooltipTrigger><TooltipContent>Email templates</TooltipContent></Tooltip>
-          <Tooltip><TooltipTrigger asChild><span className="inline-flex items-center gap-1"><Phone className="h-3.5 w-3.5" /><span className="font-medium text-foreground">{phoneScripts.length}</span></span></TooltipTrigger><TooltipContent>Call scripts</TooltipContent></Tooltip>
-          <Tooltip><TooltipTrigger asChild><span className="inline-flex items-center gap-1"><MessageSquare className="h-3.5 w-3.5" /><span className="font-medium text-foreground">{linkedinTemplates.length}</span></span></TooltipTrigger><TooltipContent>LinkedIn messages</TooltipContent></Tooltip>
+          {showEmails && <Tooltip><TooltipTrigger asChild><span className="inline-flex items-center gap-1"><Mail className="h-3.5 w-3.5" /><span className="font-medium text-foreground">{regularEmailTemplates.length}</span></span></TooltipTrigger><TooltipContent>Email templates</TooltipContent></Tooltip>}
+          {showCalls && <Tooltip><TooltipTrigger asChild><span className="inline-flex items-center gap-1"><Phone className="h-3.5 w-3.5" /><span className="font-medium text-foreground">{phoneScripts.length}</span></span></TooltipTrigger><TooltipContent>Call scripts</TooltipContent></Tooltip>}
+          {showLinkedIn && <Tooltip><TooltipTrigger asChild><span className="inline-flex items-center gap-1"><MessageSquare className="h-3.5 w-3.5" /><span className="font-medium text-foreground">{linkedinTemplates.length}</span></span></TooltipTrigger><TooltipContent>LinkedIn messages</TooltipContent></Tooltip>}
           <Tooltip><TooltipTrigger asChild><span className="inline-flex items-center gap-1"><FileText className="h-3.5 w-3.5" /><span className="font-medium text-foreground">{materials.length}</span></span></TooltipTrigger><TooltipContent>Marketing materials</TooltipContent></Tooltip>
         </div>
         <div className="flex items-center gap-2">
@@ -668,9 +668,9 @@ export function CampaignMessage({ campaignId, campaign, selectedRegions = [], au
               <Button size="sm" variant="outline" className="h-7 text-xs"><Plus className="h-3.5 w-3.5 mr-1" /> Add</Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => { setActiveTab("emails"); openEmailCreate(); }}><Mail className="h-3.5 w-3.5 mr-2" /> New email</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => { setActiveTab("scripts"); openScriptCreate(); }}><Phone className="h-3.5 w-3.5 mr-2" /> New call script</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => { setActiveTab("linkedin"); openLinkedinCreate(); }}><MessageSquare className="h-3.5 w-3.5 mr-2" /> New LinkedIn message</DropdownMenuItem>
+              {showEmails && <DropdownMenuItem onClick={() => { setActiveTab("emails"); openEmailCreate(); }}><Mail className="h-3.5 w-3.5 mr-2" /> New email</DropdownMenuItem>}
+              {showCalls && <DropdownMenuItem onClick={() => { setActiveTab("scripts"); openScriptCreate(); }}><Phone className="h-3.5 w-3.5 mr-2" /> New call script</DropdownMenuItem>}
+              {showLinkedIn && <DropdownMenuItem onClick={() => { setActiveTab("linkedin"); openLinkedinCreate(); }}><MessageSquare className="h-3.5 w-3.5 mr-2" /> New LinkedIn message</DropdownMenuItem>}
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => { setActiveTab("materials"); document.getElementById("material-upload")?.click(); }}><Upload className="h-3.5 w-3.5 mr-2" /> Upload material</DropdownMenuItem>
             </DropdownMenuContent>
@@ -680,14 +680,14 @@ export function CampaignMessage({ campaignId, campaign, selectedRegions = [], au
 
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
         <TabsList className="h-9">
-          <TabsTrigger value="emails" className="text-xs">Emails ({regularEmailTemplates.length})</TabsTrigger>
-          <TabsTrigger value="scripts" className="text-xs">Call Scripts ({phoneScripts.length})</TabsTrigger>
-          <TabsTrigger value="linkedin" className="text-xs">LinkedIn ({linkedinTemplates.length})</TabsTrigger>
+          {showEmails && <TabsTrigger value="emails" className="text-xs">Emails ({regularEmailTemplates.length})</TabsTrigger>}
+          {showCalls && <TabsTrigger value="scripts" className="text-xs">Call Scripts ({phoneScripts.length})</TabsTrigger>}
+          {showLinkedIn && <TabsTrigger value="linkedin" className="text-xs">LinkedIn ({linkedinTemplates.length})</TabsTrigger>}
           <TabsTrigger value="materials" className="text-xs">Materials ({materials.length})</TabsTrigger>
         </TabsList>
-        <TabsContent value="emails" className="mt-3">{renderEmails()}</TabsContent>
-        <TabsContent value="scripts" className="mt-3">{renderScripts()}</TabsContent>
-        <TabsContent value="linkedin" className="mt-3">{renderLinkedIn()}</TabsContent>
+        {showEmails && <TabsContent value="emails" className="mt-3">{renderEmails()}</TabsContent>}
+        {showCalls && <TabsContent value="scripts" className="mt-3">{renderScripts()}</TabsContent>}
+        {showLinkedIn && <TabsContent value="linkedin" className="mt-3">{renderLinkedIn()}</TabsContent>}
         <TabsContent value="materials" className="mt-3">{renderMaterials()}</TabsContent>
       </Tabs>
 
