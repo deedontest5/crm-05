@@ -201,12 +201,15 @@ export function CampaignModal({ open, onClose, campaign, onCreated }: CampaignMo
             <div className="space-y-1">
               <Label className="text-xs font-medium">Channel</Label>
               <Select value={formData.primary_channel || "none"} onValueChange={(v) => setFormData({ ...formData, primary_channel: v === "none" ? "" : v })}>
-                <SelectTrigger className="h-9"><SelectValue placeholder="Select" /></SelectTrigger>
+                <SelectTrigger className="h-9"><SelectValue placeholder="Mixed (all channels)" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">— Not set —</SelectItem>
+                  <SelectItem value="none">Mixed (all channels)</SelectItem>
                   {CHANNEL_OPTIONS.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
                 </SelectContent>
               </Select>
+              <p className="text-[10px] text-muted-foreground leading-tight">
+                Picking a single channel hides the other channel tabs in Setup &amp; Monitoring. Choose Mixed to keep all options.
+              </p>
             </div>
           </div>
 
