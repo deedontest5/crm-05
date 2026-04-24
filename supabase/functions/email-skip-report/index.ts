@@ -221,8 +221,8 @@ Deno.serve(async (req) => {
 
     const pdfBytes = await pdfDoc.save();
     // Wrap in Blob to satisfy Deno BodyInit typing across runtime versions.
-    const body = new Blob([pdfBytes as BlobPart], { type: "application/pdf" });
-    return new Response(body, {
+    const pdfBlob = new Blob([pdfBytes as BlobPart], { type: "application/pdf" });
+    return new Response(pdfBlob, {
       status: 200,
       headers: {
         ...corsHeaders,
