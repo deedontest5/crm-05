@@ -307,7 +307,7 @@ export default function CampaignDetail() {
                 <DropdownMenuItem onClick={() => setEditOpen(true)}>
                   <Pencil className="h-3.5 w-3.5 mr-2" /> Edit
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => cloneCampaign.mutateAsync(campaign.id).then((newId) => { if (newId) { const slug = (campaign.campaign_name + " (Copy)").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""); navigate(`/campaigns/${slug}`); } })}>
+                <DropdownMenuItem onClick={() => cloneCampaign.mutateAsync(campaign.id).then((res) => { if (res?.slug) navigate(`/campaigns/${res.slug}`); else if (res?.id) navigate(`/campaigns/${res.id}`); })}>
                   <Copy className="h-3.5 w-3.5 mr-2" /> Clone
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setArchiveOpen(true)}>
