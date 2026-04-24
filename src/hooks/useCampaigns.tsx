@@ -133,6 +133,8 @@ export function useCampaigns(options: UseCampaignsOptions = {}) {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["campaigns"] });
       queryClient.invalidateQueries({ queryKey: ["campaign", data.id] });
+      queryClient.invalidateQueries({ queryKey: ["campaign-primary-channel", data.id] });
+      queryClient.invalidateQueries({ queryKey: ["campaign-meta-table", data.id] });
       toast({ title: "Campaign updated successfully" });
     },
     onError: (error: Error) => {
