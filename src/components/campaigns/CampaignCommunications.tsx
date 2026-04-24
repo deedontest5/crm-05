@@ -1630,18 +1630,24 @@ export function CampaignCommunications({ campaignId, isCampaignEnded, viewMode, 
             RIGHT: [Clear] [View switch] [Synced · refresh] [Primary Action] [Ended] */}
         <div className="flex flex-wrap items-center gap-2">
           <TabsList className="h-7">
-            <TabsTrigger value="email" className="text-xs h-6 px-2.5 gap-1.5">
-              <Mail className="h-3 w-3" /> Email
-              <span className="tabular-nums text-muted-foreground">{reachableCounts.email}/{campaignContacts.length}</span>
-            </TabsTrigger>
-            <TabsTrigger value="linkedin" className="text-xs h-6 px-2.5 gap-1.5">
-              <Linkedin className="h-3 w-3" /> LinkedIn
-              <span className="tabular-nums text-muted-foreground">{reachableCounts.linkedin}/{campaignContacts.length}</span>
-            </TabsTrigger>
-            <TabsTrigger value="call" className="text-xs h-6 px-2.5 gap-1.5">
-              <Phone className="h-3 w-3" /> Call
-              <span className="tabular-nums text-muted-foreground">{reachableCounts.phone}/{campaignContacts.length}</span>
-            </TabsTrigger>
+            {(!primaryChannel || primaryChannel === "Email") && (
+              <TabsTrigger value="email" className="text-xs h-6 px-2.5 gap-1.5">
+                <Mail className="h-3 w-3" /> Email
+                <span className="tabular-nums text-muted-foreground">{reachableCounts.email}/{campaignContacts.length}</span>
+              </TabsTrigger>
+            )}
+            {(!primaryChannel || primaryChannel === "LinkedIn") && (
+              <TabsTrigger value="linkedin" className="text-xs h-6 px-2.5 gap-1.5">
+                <Linkedin className="h-3 w-3" /> LinkedIn
+                <span className="tabular-nums text-muted-foreground">{reachableCounts.linkedin}/{campaignContacts.length}</span>
+              </TabsTrigger>
+            )}
+            {(!primaryChannel || primaryChannel === "Phone" || primaryChannel === "Call") && (
+              <TabsTrigger value="call" className="text-xs h-6 px-2.5 gap-1.5">
+                <Phone className="h-3 w-3" /> Call
+                <span className="tabular-nums text-muted-foreground">{reachableCounts.phone}/{campaignContacts.length}</span>
+              </TabsTrigger>
+            )}
           </TabsList>
 
           {renderFilterControls()}
