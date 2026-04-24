@@ -40,9 +40,6 @@ const CampaignAnalytics = lazy(() =>
 const CampaignActionItems = lazy(() =>
   import("@/components/campaigns/CampaignActionItems").then((m) => ({ default: m.CampaignActionItems }))
 );
-const ReplyHealthDashboard = lazy(() =>
-  import("@/components/campaigns/ReplyHealthDashboard").then((m) => ({ default: m.ReplyHealthDashboard }))
-);
 
 const TabFallback = () => (
   <div className="space-y-3 py-2">
