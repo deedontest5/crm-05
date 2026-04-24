@@ -387,7 +387,27 @@ export function CampaignMessage({ campaignId, campaign, selectedRegions = [], au
 
   const MATERIAL_TYPES = ["One Pager", "Presentation", "Case Study", "Brochure", "Other"];
 
+  // Channel-aware visibility. Empty / "Mixed" = show everything.
+  const ch = (campaign?.primary_channel || "").trim();
+  const showEmails = !ch || ch === "Email";
+  const showCalls = !ch || ch === "Phone" || ch === "Call";
+  const showLinkedIn = !ch || ch === "LinkedIn";
+
+  const tabsConfig: Array<{ key: "emails" | "scripts" | "linkedin" | "materials"; visible: boolean }> = [
+    { key: "emails", visible: showEmails },
+    { key: "scripts", visible: showCalls },
+    { key: "linkedin", visible: showLinkedIn },
+    { key: "materials", visible: true },
+  ];
+  const visibleTabKeys = tabsConfig.filter(t => t.visible).map(t => t.key);
+
   const [activeTab, setActiveTab] = useState<"emails" | "scripts" | "linkedin" | "materials">("emails");
+
+  // Re-pin to a visible tab if the channel changes and the active tab gets hidden.
+  if (visibleTabKeys.length > 0 && !visibleTabKeys.includes(activeTab)) {
+    // Defer to next tick to avoid setState during render in StrictMode.
+    queueMicrotask(() => setActiveTab(visibleTabKeys[0]));
+  }
 
   const renderEmails = () => (
     <>
