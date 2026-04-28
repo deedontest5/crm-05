@@ -1211,7 +1211,9 @@ export function EmailComposeModal({ open, onOpenChange, campaignId, contacts: co
                           <Search className="h-3 w-3 text-muted-foreground shrink-0" />
                           <Input
                             value={recipientSearch}
-                            onChange={e => setRecipientSearch(e.target.value)}
+                            onChange={e => { setRecipientSearch(e.target.value); bumpRecipientActivity(); }}
+                            onFocus={() => { recipientsSearchFocusRef.current = true; bumpRecipientActivity(); }}
+                            onBlur={() => { recipientsSearchFocusRef.current = false; bumpRecipientActivity(); }}
                             placeholder="Search…"
                             className="h-6 border-0 bg-transparent text-xs px-1 focus-visible:ring-0 focus-visible:ring-offset-0 min-w-0"
                           />
@@ -1221,7 +1223,7 @@ export function EmailComposeModal({ open, onOpenChange, campaignId, contacts: co
                           variant="outline"
                           size="sm"
                           className="h-6 text-[10px] px-2 shrink-0"
-                          onClick={toggleSelectAllFiltered}
+                          onClick={() => { toggleSelectAllFiltered(); bumpRecipientActivity(); }}
                           disabled={selectableFiltered.length === 0}
                         >
                           {allFilteredSelected ? "Clear" : "All"}
@@ -1245,18 +1247,28 @@ export function EmailComposeModal({ open, onOpenChange, campaignId, contacts: co
                         )}
                       </div>
                     )}
+                    {autoCollapseArmed && (
+                      <span className="text-[9px] text-muted-foreground shrink-0 hidden md:inline" title="Recipient list auto-collapses after 10 seconds of no activity">
+                        auto-collapse 10s
+                      </span>
+                    )}
                     <Button
                       type="button"
                       variant="ghost"
                       size="sm"
                       className="h-6 text-[10px] px-2 shrink-0 gap-1"
-                      onClick={() => setRecipientsExpanded(v => !v)}
+                      onClick={() => { setRecipientsExpanded(v => !v); bumpRecipientActivity(); }}
                     >
                       {recipientsExpanded ? "Collapse" : "Edit"}
                     </Button>
                   </div>
                   {recipientsExpanded && (
-                    <div className="max-h-[180px] overflow-y-auto divide-y bg-background">
+                    <div
+                      className="max-h-[180px] overflow-y-auto divide-y bg-background"
+                      onMouseEnter={() => { recipientsHoverRef.current = true; bumpRecipientActivity(); }}
+                      onMouseLeave={() => { recipientsHoverRef.current = false; bumpRecipientActivity(); }}
+                      onScroll={bumpRecipientActivity}
+                    >
                       {filteredContacts.length === 0 && (
                         <p className="text-xs text-muted-foreground p-2">No contacts.</p>
                       )}
