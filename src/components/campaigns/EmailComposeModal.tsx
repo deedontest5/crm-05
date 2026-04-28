@@ -1053,19 +1053,6 @@ export function EmailComposeModal({ open, onOpenChange, campaignId, contacts: co
                 </ToggleGroup>
               )}
               <div className="ml-auto flex items-center gap-2 min-w-0">
-                {!isReplyMode && senderEmail && (
-                  <TooltipProvider delayDuration={150}>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <span className="hidden sm:flex items-center gap-1 text-[11px] font-normal text-muted-foreground min-w-0">
-                          <Mail className="h-3 w-3 shrink-0" />
-                          <span className="text-foreground truncate max-w-[140px]">{senderEmail}</span>
-                        </span>
-                      </TooltipTrigger>
-                      <TooltipContent>From: {senderEmail}</TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                )}
                 <Button
                   type="button"
                   variant="outline"
