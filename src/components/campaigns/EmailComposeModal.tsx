@@ -912,6 +912,19 @@ export function EmailComposeModal({ open, onOpenChange, campaignId, contacts: co
   };
 
   const handleSendClick = async () => {
+    // Schedule sanity: block if the chosen time is already in the past
+    // (modal may have been open for several minutes).
+    if (!isReplyMode && mode === "bulk" && scheduledAt) {
+      const scheduledMs = new Date(scheduledAt).getTime();
+      if (!Number.isFinite(scheduledMs) || scheduledMs <= Date.now() + 30_000) {
+        toast({
+          title: "Scheduled time is in the past",
+          description: "Pick a future time at least a minute from now, or clear the schedule to send immediately.",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
     if (!isReplyMode && selectedBouncedCount > 0) {
       setBounceConfirmOpen(true);
       return;
