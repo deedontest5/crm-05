@@ -1283,36 +1283,6 @@ export function EmailComposeModal({ open, onOpenChange, campaignId, contacts: co
                 <div className="flex items-center justify-between gap-2 flex-wrap">
                   <Label className="text-xs flex items-center gap-1.5">
                     Subject *
-                    {!isReplyMode && (
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <button
-                            type="button"
-                            className="inline-flex items-center gap-1 rounded border px-1.5 py-0 h-5 text-[10px] text-muted-foreground hover:bg-muted"
-                            title="Insert variable"
-                          >
-                            {"{…}"} vars
-                          </button>
-                        </PopoverTrigger>
-                        <PopoverContent align="start" className="w-auto max-w-[340px] p-2">
-                          <div className="text-[10px] text-muted-foreground mb-1.5">
-                            Insert into <span className="font-semibold">{focusedField}</span>
-                          </div>
-                          <div className="flex flex-wrap gap-1">
-                            {AVAILABLE_VARIABLES.map(v => (
-                              <Badge
-                                key={v}
-                                variant="outline"
-                                className="text-[10px] px-1.5 py-0 cursor-pointer hover:bg-muted"
-                                onMouseDown={(e) => { e.preventDefault(); insertVariable(v); }}
-                              >
-                                {v}
-                              </Badge>
-                            ))}
-                          </div>
-                        </PopoverContent>
-                      </Popover>
-                    )}
                   </Label>
                   {(subjectWarn || subjectTooLong) && (
                     <span
