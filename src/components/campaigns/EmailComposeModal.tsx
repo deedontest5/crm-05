@@ -1301,8 +1301,8 @@ export function EmailComposeModal({ open, onOpenChange, campaignId, contacts: co
             </div>
             )}
 
-            {/* Subject + Template — Reply mode shows Subject full-width (Template is paired with Recipient above) */}
-            <div className={isReplyMode ? "" : "grid grid-cols-1 sm:grid-cols-[1fr_220px] gap-2 items-end"}>
+            {/* Subject — full width (Template now paired with Recipient above) */}
+            <div>
               <div className="space-y-0.5 min-w-0">
                 <div className="flex items-center justify-between gap-2 flex-wrap">
                   <Label className="text-xs flex items-center gap-1.5">
@@ -1326,30 +1326,6 @@ export function EmailComposeModal({ open, onOpenChange, campaignId, contacts: co
                   className="h-8 text-sm"
                 />
               </div>
-              {!isReplyMode && (
-                <div className="space-y-0.5 min-w-0">
-                  <Label className="text-xs flex items-center gap-1.5">
-                    <FileText className="h-3 w-3" />
-                    Template
-                  </Label>
-                  <Select value={templateId} onValueChange={handleTemplateSelect}>
-                    <SelectTrigger className="h-8 text-sm">
-                      <SelectValue placeholder="Optional…" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {templates.map(t => (
-                        <SelectItem key={t.id} value={t.id}>
-                          <div className="flex items-center gap-2">
-                            <FileText className="h-3 w-3" />
-                            <span className="truncate">{t.template_name}</span>
-                            {t.email_type && <Badge variant="secondary" className="text-[10px] px-1 py-0">{t.email_type}</Badge>}
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
             </div>
 
             {/* Body editor — full width (preview lives in a dedicated modal) */}
