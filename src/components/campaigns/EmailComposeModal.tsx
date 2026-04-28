@@ -647,7 +647,11 @@ export function EmailComposeModal({ open, onOpenChange, campaignId, contacts: co
     // function caps each call at MAX_ITEMS=1000.
     const ENQUEUE_THRESHOLD = campaignSettings.enqueueThreshold;
     const ENQUEUE_CHUNK = 1000; // matches enqueue-campaign-send MAX_ITEMS
-    if (!isReplyMode && mode === "bulk" && sendable.length >= ENQUEUE_THRESHOLD) {
+    // Always route through the queue when a schedule is set — the runner +
+    // claim_send_job_items RPC honour campaign_send_jobs.scheduled_at, but
+    // the direct per-recipient send path below does not.
+    const mustEnqueueForSchedule = !isReplyMode && mode === "bulk" && !!scheduledAt;
+    if (!isReplyMode && mode === "bulk" && (sendable.length >= ENQUEUE_THRESHOLD || mustEnqueueForSchedule)) {
       try {
         const items = sendable.map((c) => {
           const finalSubject = renderForContact(subject, c);
