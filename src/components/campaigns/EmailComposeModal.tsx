@@ -1639,10 +1639,15 @@ export function EmailComposeModal({ open, onOpenChange, campaignId, contacts: co
                 noReachable ||
                 subjectTooLong ||
                 attachmentSizeBytes > MAX_ATTACHMENT_BYTES;
+              const isScheduled = !isReplyMode && mode === "bulk" && !!scheduledAt;
               const labelEl = sending ? (
                 `Sending ${sentSoFar}/${totalToSend}…`
               ) : noReachable ? (
                 "0 valid emails"
+              ) : isScheduled ? (
+                activeRecipientIds.length <= 1
+                  ? "Schedule Send"
+                  : `Schedule ${reachable} email${reachable === 1 ? "" : "s"}`
               ) : activeRecipientIds.length <= 1 ? (
                 "Send Email"
               ) : (() => {
@@ -1660,9 +1665,11 @@ export function EmailComposeModal({ open, onOpenChange, campaignId, contacts: co
                         </Button>
                       </span>
                     </TooltipTrigger>
-                    {noReachable && (
+                    {noReachable ? (
                       <TooltipContent>0 recipients with valid email — Send disabled</TooltipContent>
-                    )}
+                    ) : isScheduled ? (
+                      <TooltipContent>Will be sent at {new Date(scheduledAt).toLocaleString()}</TooltipContent>
+                    ) : null}
                   </Tooltip>
                 </TooltipProvider>
               );
