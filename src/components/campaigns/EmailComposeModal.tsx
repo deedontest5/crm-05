@@ -961,29 +961,70 @@ export function EmailComposeModal({ open, onOpenChange, campaignId, contacts: co
   // Collapse recipient list once user has picked some — saves vertical space.
   const [recipientsExpanded, setRecipientsExpanded] = useState(true);
 
-  // Schedule "min" / "max" — recomputed when the modal opens so a fresh "now"
-  // is used each session, but stable across in-session re-renders.
+  // Schedule "min" — re-tick every 30 s so a long-open modal can't accept a
+  // value that's already in the past by the time Send is clicked.
+  const [nowTick, setNowTick] = useState(() => Date.now());
+  useEffect(() => {
+    if (!open) return;
+    const t = setInterval(() => setNowTick(Date.now()), 30_000);
+    return () => clearInterval(t);
+  }, [open]);
   const scheduleMin = useMemo(
-    () => new Date(Date.now() + 60_000).toISOString().slice(0, 16),
-    [open]
+    () => new Date(nowTick + 60_000).toISOString().slice(0, 16),
+    [nowTick]
   );
   const scheduleMax = useMemo(
-    () => new Date(Date.now() + 365 * 24 * 60 * 60_000).toISOString().slice(0, 16),
-    [open]
+    () => new Date(nowTick + 365 * 24 * 60 * 60_000).toISOString().slice(0, 16),
+    [nowTick]
   );
 
-  // Auto-collapse recipients shortly after the user finishes selecting.
+  // ── Recipient list: 10-second idle auto-collapse ─────────────────
+  // Earlier behaviour collapsed the list 350 ms after every checkbox
+  // toggle, which made multi-select feel broken. New behaviour: only
+  // collapse after 10 s of NO interaction — checkbox toggles, search
+  // typing, "All/Clear" clicks, hover, or scroll all reset the timer.
+  const recipientsHoverRef = useRef(false);
+  const recipientsSearchFocusRef = useRef(false);
+  const [recipientsActivityTick, setRecipientsActivityTick] = useState(0);
+  const bumpRecipientActivity = () => setRecipientsActivityTick((n) => n + 1);
+
+  // Re-expand whenever selection drops to zero.
   useEffect(() => {
     if (mode !== "bulk") return;
     if (selectedContactIds.length === 0) {
       setRecipientsExpanded(true);
-      return;
     }
-    if (!recipientSearch) {
-      const t = setTimeout(() => setRecipientsExpanded(false), 350);
-      return () => clearTimeout(t);
-    }
-  }, [selectedContactIds, recipientSearch, mode]);
+  }, [selectedContactIds, mode]);
+
+  // Idle-collapse timer.
+  useEffect(() => {
+    if (!open) return;
+    if (mode !== "bulk") return;
+    if (!recipientsExpanded) return;
+    if (selectedContactIds.length === 0) return;
+    if (recipientSearch) return; // never collapse while searching
+    const t = setTimeout(() => {
+      // Re-check guards at fire time — state may have changed.
+      if (recipientsHoverRef.current) return;
+      if (recipientsSearchFocusRef.current) return;
+      setRecipientsExpanded(false);
+    }, 10_000);
+    return () => clearTimeout(t);
+  }, [
+    open,
+    mode,
+    recipientsExpanded,
+    selectedContactIds.length,
+    recipientSearch,
+    recipientsActivityTick,
+  ]);
+
+  // Whether the auto-collapse timer is currently armed (drives the hint label).
+  const autoCollapseArmed =
+    mode === "bulk" &&
+    recipientsExpanded &&
+    selectedContactIds.length > 0 &&
+    !recipientSearch;
 
   // Keep previewContactId valid: if it points to a no-longer-active recipient,
   // snap to the first active one (or clear).
