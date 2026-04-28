@@ -1113,7 +1113,8 @@ export function EmailComposeModal({ open, onOpenChange, campaignId, contacts: co
                 </div>
               </div>
             ) : (
-            <div className="space-y-1">
+            <div className="grid grid-cols-1 sm:grid-cols-[1fr_220px] gap-2 items-end">
+              <div className="space-y-1 min-w-0">
               {mode === "single" && (
                 <Label className="text-xs flex items-center gap-1.5">
                   <Users className="h-3 w-3" />
@@ -1123,7 +1124,7 @@ export function EmailComposeModal({ open, onOpenChange, campaignId, contacts: co
 
               {mode === "single" ? (
                 <Select value={singleContactId} onValueChange={setSingleContactId}>
-                  <SelectTrigger className="h-8 text-sm w-full max-w-[340px]">
+                  <SelectTrigger className="h-8 text-sm w-full">
                     <SelectValue placeholder="Select a contact..." />
                   </SelectTrigger>
                   <SelectContent>
@@ -1274,6 +1275,29 @@ export function EmailComposeModal({ open, onOpenChange, campaignId, contacts: co
                   )}
                 </div>
               )}
+              </div>
+              <div className="space-y-1 min-w-0">
+                <Label className="text-xs flex items-center gap-1.5">
+                  <FileText className="h-3 w-3" />
+                  Template
+                </Label>
+                <Select value={templateId} onValueChange={handleTemplateSelect}>
+                  <SelectTrigger className="h-8 text-sm">
+                    <SelectValue placeholder="Optional…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {templates.map(t => (
+                      <SelectItem key={t.id} value={t.id}>
+                        <div className="flex items-center gap-2">
+                          <FileText className="h-3 w-3" />
+                          <span className="truncate">{t.template_name}</span>
+                          {t.email_type && <Badge variant="secondary" className="text-[10px] px-1 py-0">{t.email_type}</Badge>}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             )}
 
