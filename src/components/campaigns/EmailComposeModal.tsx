@@ -647,7 +647,11 @@ export function EmailComposeModal({ open, onOpenChange, campaignId, contacts: co
     // function caps each call at MAX_ITEMS=1000.
     const ENQUEUE_THRESHOLD = campaignSettings.enqueueThreshold;
     const ENQUEUE_CHUNK = 1000; // matches enqueue-campaign-send MAX_ITEMS
-    if (!isReplyMode && mode === "bulk" && sendable.length >= ENQUEUE_THRESHOLD) {
+    // Always route through the queue when a schedule is set — the runner +
+    // claim_send_job_items RPC honour campaign_send_jobs.scheduled_at, but
+    // the direct per-recipient send path below does not.
+    const mustEnqueueForSchedule = !isReplyMode && mode === "bulk" && !!scheduledAt;
+    if (!isReplyMode && mode === "bulk" && (sendable.length >= ENQUEUE_THRESHOLD || mustEnqueueForSchedule)) {
       try {
         const items = sendable.map((c) => {
           const finalSubject = renderForContact(subject, c);
@@ -912,6 +916,19 @@ export function EmailComposeModal({ open, onOpenChange, campaignId, contacts: co
   };
 
   const handleSendClick = async () => {
+    // Schedule sanity: block if the chosen time is already in the past
+    // (modal may have been open for several minutes).
+    if (!isReplyMode && mode === "bulk" && scheduledAt) {
+      const scheduledMs = new Date(scheduledAt).getTime();
+      if (!Number.isFinite(scheduledMs) || scheduledMs <= Date.now() + 30_000) {
+        toast({
+          title: "Scheduled time is in the past",
+          description: "Pick a future time at least a minute from now, or clear the schedule to send immediately.",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
     if (!isReplyMode && selectedBouncedCount > 0) {
       setBounceConfirmOpen(true);
       return;
@@ -961,29 +978,70 @@ export function EmailComposeModal({ open, onOpenChange, campaignId, contacts: co
   // Collapse recipient list once user has picked some — saves vertical space.
   const [recipientsExpanded, setRecipientsExpanded] = useState(true);
 
-  // Schedule "min" / "max" — recomputed when the modal opens so a fresh "now"
-  // is used each session, but stable across in-session re-renders.
+  // Schedule "min" — re-tick every 30 s so a long-open modal can't accept a
+  // value that's already in the past by the time Send is clicked.
+  const [nowTick, setNowTick] = useState(() => Date.now());
+  useEffect(() => {
+    if (!open) return;
+    const t = setInterval(() => setNowTick(Date.now()), 30_000);
+    return () => clearInterval(t);
+  }, [open]);
   const scheduleMin = useMemo(
-    () => new Date(Date.now() + 60_000).toISOString().slice(0, 16),
-    [open]
+    () => new Date(nowTick + 60_000).toISOString().slice(0, 16),
+    [nowTick]
   );
   const scheduleMax = useMemo(
-    () => new Date(Date.now() + 365 * 24 * 60 * 60_000).toISOString().slice(0, 16),
-    [open]
+    () => new Date(nowTick + 365 * 24 * 60 * 60_000).toISOString().slice(0, 16),
+    [nowTick]
   );
 
-  // Auto-collapse recipients shortly after the user finishes selecting.
+  // ── Recipient list: 10-second idle auto-collapse ─────────────────
+  // Earlier behaviour collapsed the list 350 ms after every checkbox
+  // toggle, which made multi-select feel broken. New behaviour: only
+  // collapse after 10 s of NO interaction — checkbox toggles, search
+  // typing, "All/Clear" clicks, hover, or scroll all reset the timer.
+  const recipientsHoverRef = useRef(false);
+  const recipientsSearchFocusRef = useRef(false);
+  const [recipientsActivityTick, setRecipientsActivityTick] = useState(0);
+  const bumpRecipientActivity = () => setRecipientsActivityTick((n) => n + 1);
+
+  // Re-expand whenever selection drops to zero.
   useEffect(() => {
     if (mode !== "bulk") return;
     if (selectedContactIds.length === 0) {
       setRecipientsExpanded(true);
-      return;
     }
-    if (!recipientSearch) {
-      const t = setTimeout(() => setRecipientsExpanded(false), 350);
-      return () => clearTimeout(t);
-    }
-  }, [selectedContactIds, recipientSearch, mode]);
+  }, [selectedContactIds, mode]);
+
+  // Idle-collapse timer.
+  useEffect(() => {
+    if (!open) return;
+    if (mode !== "bulk") return;
+    if (!recipientsExpanded) return;
+    if (selectedContactIds.length === 0) return;
+    if (recipientSearch) return; // never collapse while searching
+    const t = setTimeout(() => {
+      // Re-check guards at fire time — state may have changed.
+      if (recipientsHoverRef.current) return;
+      if (recipientsSearchFocusRef.current) return;
+      setRecipientsExpanded(false);
+    }, 10_000);
+    return () => clearTimeout(t);
+  }, [
+    open,
+    mode,
+    recipientsExpanded,
+    selectedContactIds.length,
+    recipientSearch,
+    recipientsActivityTick,
+  ]);
+
+  // Whether the auto-collapse timer is currently armed (drives the hint label).
+  const autoCollapseArmed =
+    mode === "bulk" &&
+    recipientsExpanded &&
+    selectedContactIds.length > 0 &&
+    !recipientSearch;
 
   // Keep previewContactId valid: if it points to a no-longer-active recipient,
   // snap to the first active one (or clear).
@@ -1170,7 +1228,9 @@ export function EmailComposeModal({ open, onOpenChange, campaignId, contacts: co
                           <Search className="h-3 w-3 text-muted-foreground shrink-0" />
                           <Input
                             value={recipientSearch}
-                            onChange={e => setRecipientSearch(e.target.value)}
+                            onChange={e => { setRecipientSearch(e.target.value); bumpRecipientActivity(); }}
+                            onFocus={() => { recipientsSearchFocusRef.current = true; bumpRecipientActivity(); }}
+                            onBlur={() => { recipientsSearchFocusRef.current = false; bumpRecipientActivity(); }}
                             placeholder="Search…"
                             className="h-6 border-0 bg-transparent text-xs px-1 focus-visible:ring-0 focus-visible:ring-offset-0 min-w-0"
                           />
@@ -1180,7 +1240,7 @@ export function EmailComposeModal({ open, onOpenChange, campaignId, contacts: co
                           variant="outline"
                           size="sm"
                           className="h-6 text-[10px] px-2 shrink-0"
-                          onClick={toggleSelectAllFiltered}
+                          onClick={() => { toggleSelectAllFiltered(); bumpRecipientActivity(); }}
                           disabled={selectableFiltered.length === 0}
                         >
                           {allFilteredSelected ? "Clear" : "All"}
@@ -1204,18 +1264,28 @@ export function EmailComposeModal({ open, onOpenChange, campaignId, contacts: co
                         )}
                       </div>
                     )}
+                    {autoCollapseArmed && (
+                      <span className="text-[9px] text-muted-foreground shrink-0 hidden md:inline" title="Recipient list auto-collapses after 10 seconds of no activity">
+                        auto-collapse 10s
+                      </span>
+                    )}
                     <Button
                       type="button"
                       variant="ghost"
                       size="sm"
                       className="h-6 text-[10px] px-2 shrink-0 gap-1"
-                      onClick={() => setRecipientsExpanded(v => !v)}
+                      onClick={() => { setRecipientsExpanded(v => !v); bumpRecipientActivity(); }}
                     >
                       {recipientsExpanded ? "Collapse" : "Edit"}
                     </Button>
                   </div>
                   {recipientsExpanded && (
-                    <div className="max-h-[180px] overflow-y-auto divide-y bg-background">
+                    <div
+                      className="max-h-[180px] overflow-y-auto divide-y bg-background"
+                      onMouseEnter={() => { recipientsHoverRef.current = true; bumpRecipientActivity(); }}
+                      onMouseLeave={() => { recipientsHoverRef.current = false; bumpRecipientActivity(); }}
+                      onScroll={bumpRecipientActivity}
+                    >
                       {filteredContacts.length === 0 && (
                         <p className="text-xs text-muted-foreground p-2">No contacts.</p>
                       )}
@@ -1229,11 +1299,12 @@ export function EmailComposeModal({ open, onOpenChange, campaignId, contacts: co
                             aria-checked={selectedContactIds.includes(c.contact_id)}
                             aria-disabled={noEmail}
                             tabIndex={noEmail ? -1 : 0}
-                            onClick={() => !noEmail && toggleContact(c.contact_id)}
+                            onClick={() => { if (!noEmail) { toggleContact(c.contact_id); bumpRecipientActivity(); } }}
                             onKeyDown={(e) => {
                               if (!noEmail && (e.key === " " || e.key === "Enter")) {
                                 e.preventDefault();
                                 toggleContact(c.contact_id);
+                                bumpRecipientActivity();
                               }
                             }}
                             className={`flex items-center gap-2 px-2 py-1 text-xs hover:bg-muted/50 ${noEmail ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
@@ -1568,10 +1639,15 @@ export function EmailComposeModal({ open, onOpenChange, campaignId, contacts: co
                 noReachable ||
                 subjectTooLong ||
                 attachmentSizeBytes > MAX_ATTACHMENT_BYTES;
+              const isScheduled = !isReplyMode && mode === "bulk" && !!scheduledAt;
               const labelEl = sending ? (
                 `Sending ${sentSoFar}/${totalToSend}…`
               ) : noReachable ? (
                 "0 valid emails"
+              ) : isScheduled ? (
+                activeRecipientIds.length <= 1
+                  ? "Schedule Send"
+                  : `Schedule ${reachable} email${reachable === 1 ? "" : "s"}`
               ) : activeRecipientIds.length <= 1 ? (
                 "Send Email"
               ) : (() => {
@@ -1589,9 +1665,11 @@ export function EmailComposeModal({ open, onOpenChange, campaignId, contacts: co
                         </Button>
                       </span>
                     </TooltipTrigger>
-                    {noReachable && (
+                    {noReachable ? (
                       <TooltipContent>0 recipients with valid email — Send disabled</TooltipContent>
-                    )}
+                    ) : isScheduled ? (
+                      <TooltipContent>Will be sent at {new Date(scheduledAt).toLocaleString()}</TooltipContent>
+                    ) : null}
                   </Tooltip>
                 </TooltipProvider>
               );
