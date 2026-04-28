@@ -1282,11 +1282,12 @@ export function EmailComposeModal({ open, onOpenChange, campaignId, contacts: co
                             aria-checked={selectedContactIds.includes(c.contact_id)}
                             aria-disabled={noEmail}
                             tabIndex={noEmail ? -1 : 0}
-                            onClick={() => !noEmail && toggleContact(c.contact_id)}
+                            onClick={() => { if (!noEmail) { toggleContact(c.contact_id); bumpRecipientActivity(); } }}
                             onKeyDown={(e) => {
                               if (!noEmail && (e.key === " " || e.key === "Enter")) {
                                 e.preventDefault();
                                 toggleContact(c.contact_id);
+                                bumpRecipientActivity();
                               }
                             }}
                             className={`flex items-center gap-2 px-2 py-1 text-xs hover:bg-muted/50 ${noEmail ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
