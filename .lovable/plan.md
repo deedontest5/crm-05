@@ -1,59 +1,52 @@
-## Diagnosis: This is a Microsoft 365 permission problem, not wrong sender routing
+# Compose Email — recipient auto-collapse + Schedule fix
 
-### What the code is actually doing (verified from logs)
+## Problems observed
 
-The send-campaign-email log line confirms the routing:
-```
-Sending campaign email from user mailbox: deepak.dongare@realthingks.com (shared mailbox: crm@realthingks.com)
-User mailbox send denied for deepak.dongare@realthingks.com; retrying via shared mailbox crm@realthingks.com
-```
+1. **Recipient list auto-collapses on every click.** In `EmailComposeModal.tsx` (lines 975–986), an effect runs on every change to `selectedContactIds` and collapses the list after 350 ms whenever there is no search text. So as soon as a user checks one box, the list snaps shut and they have to click "Edit" again to check the next person.
+2. **Schedule silently does nothing for bulk batches under the enqueue threshold.** The compose footer always shows the Schedule input for bulk (line 1490). But the send handler only routes through `enqueue-campaign-send` (which honours `scheduled_at` via the DB `claim_send_job_items` RPC) when `sendable.length >= campaignSettings.enqueueThreshold` (default **25**, line 648–650). For 1–24 recipients the code falls through to the per-recipient `send-campaign-email` loop (line 774+), which never reads `scheduledAt`. Result: the user picks a future time, clicks Send, and emails go out immediately.
+3. Minor: the auto-collapse also fights the user when they're actively typing in the search box (the effect's `if (!recipientSearch)` short-circuit means the moment they clear the search it collapses again).
 
-So:
-1. The function **first tries the logged-in user's mailbox** (`deepak.dongare@realthingks.com`) — exactly what you want. Microsoft Graph rejects it with `ErrorAccessDenied`.
-2. It then **falls back to the shared mailbox** (`crm@realthingks.com`). Microsoft Graph rejects that too with `ErrorAccessDenied`.
-3. The user-facing error message only shows the *last* attempted sender (`crm@realthingks.com`), which makes it look like the wrong mailbox was used. That's a UX bug in the message, not a routing bug.
+## Changes (frontend only — `src/components/campaigns/EmailComposeModal.tsx`)
 
-### Real root cause
+### A. Recipient auto-collapse → 10 s idle debounce
 
-The Azure AD app registration backing this integration does **not** have `Mail.Send` Application permission granted for either mailbox. Without that:
-- Per-user sends from `deepak.dongare@…` get 403.
-- Shared-mailbox sends from `crm@…` get 403 too.
+- Replace the existing effect (lines 975–986) with an **activity-based debounce**:
+  - Track the last interaction timestamp via a ref, updated whenever the user toggles a checkbox, types in the search field, clicks "All/Clear", or scrolls the recipient list.
+  - When the list is expanded and at least one recipient is selected, start a **10-second** timer that collapses the list. Any new interaction resets the timer.
+  - Never collapse while the search input has focus or contains text.
+  - Never collapse while the recipient list is being hovered (mouse over the scroll area).
+  - Keep the existing "expand again when selection drops to 0" behaviour.
+- Remove the immediate 350 ms collapse-on-pick — that's the root cause of the snap-shut feeling.
+- Manual "Collapse" / "Edit" toggle button keeps working unchanged.
 
-This must be fixed by the Microsoft 365 admin in Entra/Azure portal — no code change can grant permission.
+### B. Subtle UX polish around the recipient header
 
-### Fixes (code)
+- Show a tiny muted hint "Auto-collapses after 10s of inactivity" next to the Collapse button only when the timer is armed (selection > 0, expanded, no active search/hover). Keeps the new behaviour discoverable without being noisy.
+- Cancel the timer when the modal closes or `mode` switches away from `bulk`.
 
-1. **Make the error message accurate** — in `supabase/functions/send-campaign-email/index.ts` lines 647–650, build the message from BOTH attempts so the user can see what was tried. Example:
-   > Microsoft 365 denied mailbox send access. Tried user mailbox `deepak.dongare@realthingks.com` and shared mailbox `crm@realthingks.com`. Ask your admin to grant the Azure app `Mail.Send` Application permission (with admin consent) for the sender mailbox.
+### C. Schedule actually schedules (small batches too)
 
-   Track both attempts with a small `attemptedMailboxes: string[]` array populated where each `sendEmailViaGraph` call is made.
+- In the send handler (around line 648), change the routing rule:
+  - **If `scheduledAt` is set AND `mode === "bulk"` AND not in reply mode → always go through `enqueue-campaign-send`,** regardless of `sendable.length` vs `ENQUEUE_THRESHOLD`. The cron runner + `claim_send_job_items` already honour `j.scheduled_at`, so a single queued job at any size is enough.
+  - Otherwise keep the current threshold-based routing.
+- Add a guard: if `scheduledAt` is in the past (clock drift after the modal was open a while), block Send and toast "Scheduled time is in the past — pick a future time or clear the schedule."
+- Update the existing post-enqueue toast wording so the scheduled case reads "Scheduled N email(s) for <local time>. They'll be sent automatically." (already mostly there at line 741 — just confirm the text and keep the modal closeable).
+- Disable the Send button's label swap so it reads **"Schedule Send"** when `scheduledAt` is set, **"Send Email(s)"** otherwise. Visual cue that the click won't fire emails right now.
+- Recompute `scheduleMin` lazily on each render (or via a 30 s interval) so a modal left open for several minutes can't accept a "now-ish" value that's already in the past by the time Send is clicked. Currently `scheduleMin` is memoised on `[open]` only.
 
-2. **Surface a clear admin checklist in the toast** — when `errorCode === "ErrorAccessDenied"`, append a link/hint pointing to the Azure portal area (Entra → App registrations → API permissions). Keep the message short; the audit log already stores the raw Graph response.
+### D. Out of scope
 
-3. **Add an explicit opt-out for the shared-mailbox fallback** (optional config). New env: `AZURE_DISABLE_SHARED_FALLBACK=true`. When set, the fallback block at lines 612–634 is skipped and the user mailbox failure is reported directly. Useful when the shared mailbox isn't licensed for sending — avoids a misleading second 403 in the log.
+- No changes to edge functions, DB functions, or `useCampaignSettings`. Schedule honouring is already correct on the backend; the bug is purely the frontend bypassing the queue for small batches.
+- No changes to single-mode or reply-mode (schedule input isn't shown there).
 
-### Fixes (admin/Microsoft 365 — informational, not code)
+## Files touched
 
-In Entra admin center → App registrations → (the app whose `AZURE_EMAIL_CLIENT_ID` is in Supabase secrets):
-- API permissions → add **Microsoft Graph → Application permissions → `Mail.Send`** → Grant admin consent.
-- Then restrict the app to specific mailboxes via an **Application Access Policy** (PowerShell `New-ApplicationAccessPolicy`) so the app can ONLY send as `deepak.dongare@realthingks.com`, `crm@realthingks.com`, and any other approved senders. This is the secure pattern Microsoft documents for client-credentials Mail.Send.
-- Confirm both mailboxes have valid Exchange Online licenses.
+- `src/components/campaigns/EmailComposeModal.tsx` (only)
 
-After admin consent + access policy, re-test from the Reply modal.
+## Verification
 
-### Verification
-
-- After grant: send a reply → Graph returns 202 → `email_send_log.delivery_status = 'sent'`, `sender_email = deepak.dongare@realthingks.com`.
-- Without grant: the new error message clearly names BOTH mailboxes and the required `Mail.Send` permission, removing the confusion that prompted this report.
-
-### Out of Scope
-
-- No DB schema changes.
-- No UI redesign — only the toast/error string changes.
-- No change to `azure-email.ts` (works correctly today).
-- Follow-up runner (`campaign-follow-up-runner`) still uses the shared mailbox by design for unattended automation — out of scope for this fix.
-
-### Files to edit
-
-- `supabase/functions/send-campaign-email/index.ts` — track `attemptedMailboxes`, rebuild `userFacingError` (lines 593–650), optional env-gated fallback.
-- (Optional) `src/components/campaigns/EmailComposeModal.tsx` — when `errorCode === "ErrorAccessDenied"`, render the multi-line admin hint inside the existing `Send results` panel instead of as a single line.
+- Bulk compose, pick 2 recipients → list stays open; wait ~10 s without interaction → collapses. Click "Edit", check more → timer resets.
+- Type in search → no collapse; clear search → 10 s timer starts.
+- Bulk compose, pick 3 recipients, set Schedule to +10 min, click "Schedule Send" → toast confirms scheduled time; check `campaign_send_jobs` row has `scheduled_at` set and `status='queued'`; runner picks it up only after that time.
+- Same flow with 30 recipients (above threshold) → unchanged behaviour, still queued and scheduled.
+- Set Schedule to a past time (e.g., open modal, wait, then click Send) → blocked with clear toast.
